@@ -55,3 +55,14 @@
 已实现 URL/Request dataTask completion、嵌套工厂去重、首次 resume 计时、事件/脱敏、256 槽位 trylock 队列、异步 JSONL 和两段轮转。附带同源 tm-probe，显式执行才使用 loopback fixture 验证 40 个合成 HTTP 任务和 queue 压力。CI 新增 macOS native probe，再编译 iOS 包。
 
 静态检查通过，实际 CI/真机结果待执行。delegate、upload/download、CFNetwork 和 Socket 未覆盖，详见 `STAGE2_NSURLSESSION.md`。
+
+### 第二阶段实测结果
+
+- [CI run 40446557111](https://github.com/wwangmc/TrafficMonitor/actions/runs/40446557111) 成功：native probe、iOS 编译、打包与内容检查全部通过。首轮仅因 sharedSession 测试的队列身份假设失败，已改为测量未 hook baseline 后比较。
+- 本版 0.2.0 deb 已下载核验并安装到同一 iPhone X / iOS 16.1.1；设备端 SHA-256、版本与本地一致。
+- 真机 tm-probe 为 PASS / exit 0，40 条 HTTP 事件与 40 个唯一请求；body 字节、回调、重定向、取消/断连、脱敏、权限、队列压力检查均通过。
+- 游戏 PID 32407 成功加载 0.2.0，一次快照捕获 78 条实际 HTTPS 完成事件（GET 13、POST 65），无重复 request ID；query/userinfo/fragment 检查通过。文件 0600、目录 0700，实际查看游戏主界面。
+- 实测模块列表包含 UnityFramework 与多个 SDK，但不将这些事件归因到某个引擎/SDK，也不推算全游戏覆盖率。
+- 原始真实事件与截图只存本地 packages；仅合成测试结果和匿名计数写进项目记录。
+
+当前状态：第二阶段 dataTask completion 最小版完成并验证；其他 NSURLSession 路径仍待扩展。详细证据、哈希与限制见 `STAGE2_VERIFICATION.md`。

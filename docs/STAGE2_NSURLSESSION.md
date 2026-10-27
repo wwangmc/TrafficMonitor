@@ -1,6 +1,6 @@
 # 第二阶段：NSURLSession dataTask completion
 
-开发版本 0.2.0。源码已实现，CI/设备结果待执行后补充。0.1.0 的编译与注入结果不代表本版通过。
+版本 0.2.0。已通过本版 GitHub Actions、macOS/iOS 同源诊断和目标游戏实际 HTTPS 事件验证。完整证据见 `STAGE2_VERIFICATION.md`；delegate/upload/download 等仍未覆盖。
 
 ## 覆盖
 
@@ -42,4 +42,7 @@ CI 先编译/运行 macOS native probe，再交叉编译 iOS 包与检查内容�
 
 ## 当前结果
 
-待执行本版 CI 和真机验证。
+- [CI run 成功](https://github.com/wwangmc/TrafficMonitor/actions/runs/40446557111)，对应源码 `5a37696e267c9a9dd02221ed2e7058ef6faf83ce`。
+- macOS 和 iPhone X / iOS 16.1.1 的 probe 均 PASS，各 40 条 HTTP 事件、40 个唯一请求。原始合成结果位于 `docs/validation/stage2-probe-*.json`。
+- 已安装本版 deb，目标游戏 PID 32407 初始化成功；一次快照观测到 78 条 HTTPS 完成事件（POST 65、GET 13），query/userinfo/fragment 检查通过，目录 0700、文件 0600。
+- 这些是已覆盖路径的正例，不代表该 Unity 游戏或其他游戏的全部流量、所有 API 或真实网络层流量。

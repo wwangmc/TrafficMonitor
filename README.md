@@ -1,8 +1,8 @@
 # TrafficMonitor
 
-Theos + Objective-C++/Logos 的 iOS 越狱网络监控工程。**当前开发版 0.2.0：第二阶段 NSURLSession dataTask completion 监控和异步诊断。当前版 CI/设备验证待执行；第一阶段 0.1.0 已有 Rootless 编译和真机注入证据。Socket、SQLite 和 WebUI 尚未实现。**
+Theos + Objective-C++/Logos 的 iOS 越狱网络监控工程。**当前版本 0.2.0：NSURLSession dataTask completion 监控和有界异步诊断，已通过 CI 与 iPhone X / iOS 16.1.1 实测。Socket、SQLite 和 WebUI 尚未实现。**
 
-私有仓库：[wwangmc/TrafficMonitor](https://github.com/wwangmc/TrafficMonitor)。[成功构建 #1](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548) · [Rootless 产物](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548/artifacts/12707061218) · [验证记录](docs/BUILD_VERIFICATION.md)。
+私有仓库：[wwangmc/TrafficMonitor](https://github.com/wwangmc/TrafficMonitor)。[0.2.0 成功构建](https://github.com/wwangmc/TrafficMonitor/actions/runs/40446557111) · [Rootless 产物](https://github.com/wwangmc/TrafficMonitor/actions/runs/40446557111/artifacts/12708921251) · [本版验证记录](docs/STAGE2_VERIFICATION.md)。
 
 目标为 `com.korea.mrtgd2.ios`。检查 Bundle ID/系统版本后输出 `stage=2 event=loaded ... http_enabled=1`，被动记录受支持的 NSURLSession completion 路径。业务 Tweak 不主动发请求或监听端口；异步诊断文件位于 App 临时目录。字段、隐私、测试和覆盖限制见 [第二阶段说明](docs/STAGE2_NSURLSESSION.md)。
 
