@@ -66,6 +66,9 @@ jobs:
             https://github.com/roothide/theos.git "$THEOS"
           git -C "$THEOS" rev-parse HEAD
 
+      - name: Test SQLite collector and dashboard API
+        run: python3 -m unittest discover -s desktop -p test_backend.py -v
+
       - name: Run native HTTP integration probe
         run: |
           set -o pipefail
@@ -112,6 +115,17 @@ jobs:
             package-inspection.json
             probe-host.log
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Package local dashboard
+        run: |
+          python3 -c "import pathlib,zipfile; root=pathlib.Path('desktop'); z=zipfile.ZipFile('TrafficMonitor-Desktop.zip','w',zipfile.ZIP_DEFLATED); [z.write(p,p.as_posix()) for p in root.rglob('*') if p.is_file() and not any(x in ('data','__pycache__') for x in p.parts)]; z.close()"
+
+      - name: Upload local dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrafficMonitor-Desktop
+          path: TrafficMonitor-Desktop.zip
           retention-days: 14
 
 

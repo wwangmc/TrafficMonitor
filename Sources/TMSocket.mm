@@ -86,7 +86,11 @@ static int h_connect(int fd,const sockaddr *address,socklen_t length){
 static ssize_t h_send(int fd,const void *b,size_t n,int flags){IO_BEGIN(send,(fd,b,n,flags));IO_END(fd,true,flags,nullptr,0,n);}
 static ssize_t h_recv(int fd,void *b,size_t n,int flags){IO_BEGIN(recv,(fd,b,n,flags));IO_END(fd,false,flags,nullptr,0,n);}
 static ssize_t h_sendto(int fd,const void *b,size_t n,int flags,const sockaddr *a,socklen_t l){IO_BEGIN(sendto,(fd,b,n,flags,a,l));IO_END(fd,true,flags,a,l,n);}
-static ssize_t h_recvfrom(int fd,void *b,size_t n,int flags,sockaddr *a,socklen_t *l){IO_BEGIN(recvfrom,(fd,b,n,flags,a,l));IO_END(fd,false,flags,a,(a&&l)?*l:0,n);}
+static ssize_t h_recvfrom(int fd,void *b,size_t n,int flags,sockaddr *a,socklen_t *l){
+    if(inside)return o_recvfrom(fd,b,n,flags,a,l);Guard guard;sockaddr_storage peer{};socklen_t length=sizeof(peer);
+    sockaddr *target=a?a:(sockaddr *)&peer;socklen_t *size=a?l:&length;
+    ssize_t r=o_recvfrom(fd,b,n,flags,target,size);int saved=errno;record(fd,r,false,flags,target,size?*size:0,n);errno=saved;return r;
+}
 static ssize_t h_sendmsg(int fd,const msghdr *m,int flags){IO_BEGIN(sendmsg,(fd,m,flags));if(r>=0&&m)record(fd,r,true,flags,(const sockaddr *)m->msg_name,m->msg_namelen,iovSize(m->msg_iov,m->msg_iovlen));errno=saved;return r;}
 static ssize_t h_recvmsg(int fd,msghdr *m,int flags){IO_BEGIN(recvmsg,(fd,m,flags));if(r>=0&&m)record(fd,r,false,flags|m->msg_flags,(const sockaddr *)m->msg_name,m->msg_namelen,iovSize(m->msg_iov,m->msg_iovlen));errno=saved;return r;}
 static ssize_t h_read(int fd,void *b,size_t n){IO_BEGIN(read,(fd,b,n));IO_END(fd,false,0,nullptr,0,n);}
@@ -169,6 +173,7 @@ BOOL TMSocketSelfTest(void){
     receiveVector.iov_len=3;ok=ok&&h_readv(server,&receiveVector,1)==3;
     ok=ok&&h_write(server,"ok",2)==2&&h_read(client,data,2)==2;
     int alias=h_dup(client);ok=ok&&alias>=0&&h_send(alias,"z",1,0)==1&&h_recv(server,data,1,0)==1;
+    ok=ok&&h_dup2(client,alias)==alias;
     h_close(alias);h_close(client);h_close(server);h_close(listener);
     // Successful wrappers preserve the caller's errno; failures preserve libc's error.
     errno=0;ok=ok&&h_send(-1,"x",1,0)==-1&&errno==EBADF;

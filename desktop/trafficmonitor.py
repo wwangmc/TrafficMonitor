@@ -256,6 +256,7 @@ class Collector:
         self.commands = []
         self.lock = threading.Lock()
         self.stop = threading.Event()
+        self.udid=None
         self.selected = store.setting('selected', [DEFAULT_APP])
         self.paused = store.setting('paused', False)
         self.generation = store.setting('generation', 0)
@@ -269,7 +270,7 @@ class Collector:
         while not self.stop.is_set():
             try:
                 if not self.bridge:
-                    self.bridge = USB()
+                    self.bridge = USB(self.udid)
                 if time.time() - last_apps > 60:
                     self.apps = self.bridge.apps()
                     clock = self.bridge.shell('date +%s').strip().splitlines()[-1]
@@ -295,6 +296,8 @@ class Collector:
                 self.error, self.updated = '', time.time()
             except Exception as error:
                 self.error = str(error)[:160]
+                self.bridge=None
+                last_apps=0
             self.stop.wait(1)
 
 
@@ -324,7 +327,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return True
 
     def authorized(self):
-        return secrets.compare_digest(self.headers.get('Authorization',''), 'Bearer ' + self.server.token)
+        return secrets.compare_digest(self.headers.get('Authorization','').encode('utf-8'), ('Bearer ' + self.server.token).encode())
 
     def do_GET(self):
         if not self.allowed(): return
@@ -345,6 +348,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             state.update(connected=bool(collector.updated) and not bool(collector.error), error=collector.error, updated=collector.updated,
                          selected=collector.selected, paused=collector.paused, retention_days=store.setting('retention_days',7),
                          apps=[{'id':a['id'],'name':a['name']} for a in collector.apps])
+            with store.lock:
+                state['historical_apps']=[r[0] for r in store.db.execute('SELECT DISTINCT app FROM http UNION SELECT DISTINCT app FROM samples')]
             self.reply(200,state)
         elif parsed.path == '/api/request':
             with store.lock:
@@ -397,6 +402,7 @@ def main():
     args=parser.parse_args()
     store=Store(args.data)
     collector=Collector(store)
+    collector.udid=args.udid
     if args.udid:collector.bridge=USB(args.udid)
     if args.offline:collector.error='离线历史模式'
     else:threading.Thread(target=collector.run,daemon=True).start()
