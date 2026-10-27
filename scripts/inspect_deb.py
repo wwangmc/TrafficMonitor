@@ -60,7 +60,7 @@ def inspect(path, scheme, archs, macho=False):
         control_files = file_map(control_tar)
         control = control_tar.extractfile(control_files["control"]).read().decode("utf-8")
     fields = dict(line.split(": ", 1) for line in control.splitlines() if ": " in line)
-    expected_arch = "iphoneos-arm64" if scheme == "rootless" else "iphoneos-arm"
+    expected_arch = {"rootless":"iphoneos-arm64", "rootful":"iphoneos-arm", "roothide":"iphoneos-arm64e"}[scheme]
     if fields.get("Package") != "com.example.trafficmonitor" or fields.get("Architecture") != expected_arch:
         raise ValueError(f"Unexpected package identity/architecture: {fields}")
     prefix = "var/jb/" if scheme == "rootless" else ""
@@ -104,7 +104,7 @@ def inspect(path, scheme, archs, macho=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("package", type=Path)
-    parser.add_argument("--scheme", choices=("rootless", "rootful"), default="rootless")
+    parser.add_argument("--scheme", choices=("rootless", "rootful", "roothide"), default="rootless")
     parser.add_argument("--archs", nargs="+", default=["arm64", "arm64e"])
     parser.add_argument("--macho", action="store_true", help="Also run macOS lipo/otool")
     args = parser.parse_args()

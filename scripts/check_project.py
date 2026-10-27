@@ -85,8 +85,10 @@ def check(require_yaml=False):
         require(set(workflow.get("on", {})) == {"push", "pull_request", "workflow_dispatch"},
                 "Missing CI triggers")
         matrix = workflow["jobs"]["build"]["strategy"]["matrix"]["include"]
-        require(matrix == [{"mode": "rootless", "type": "1", "archs": "arm64 arm64e"}],
-                "CI baseline should build Rootless only")
+        require(matrix == [{"mode":"rootful","type":"0","archs":"arm64"},
+                           {"mode":"rootless","type":"1","archs":"arm64 arm64e"},
+                           {"mode":"roothide","type":"2","archs":"arm64 arm64e"}],
+                "CI should build the three independent package schemes")
     return failures
 
 
