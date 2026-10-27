@@ -3,6 +3,7 @@
 #import "../Sources/TMHTTP.h"
 #import "../Sources/TMSocket.h"
 #include "TMFixture.h"
+#import "TMIPQuery.h"
 #include <atomic>
 #include <cstdio>
 #include <sys/stat.h>
@@ -71,8 +72,19 @@ static NSURLSessionDataTask *RunCase(NSURLSession *session, dispatch_group_t gro
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
+        if (argc == 2 && strcmp(argv[1], "--query-ip") == 0) {
+            NSError *error = nil;
+            NSDictionary *result = TMQueryPublicIP(&error);
+            PrintJSON(result ?: @{@"status":@"fail",@"message":error.localizedDescription ?: @"IP query failed"});
+            return result ? 0 : 1;
+        }
+        if (argc == 2 && strcmp(argv[1], "--self-test-ip") == 0) {
+            BOOL ok = TMIPQuerySelfTest();
+            PrintJSON(@{@"result":ok ? @"PASS" : @"FAIL",@"system_proxy_query":@(ok)});
+            return ok ? 0 : 1;
+        }
         if (argc != 2 || strcmp(argv[1], "--self-test") != 0) {
-            fprintf(stderr, "Usage: tm-probe --self-test\nRuns synthetic HTTP requests against 127.0.0.1 only.\n");
+            fprintf(stderr, "Usage: tm-probe --query-ip | --self-test | --self-test-ip\n\n");
             return 2;
         }
         NSString *directory = [NSTemporaryDirectory() stringByAppendingPathComponent:
