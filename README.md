@@ -1,10 +1,10 @@
 # TrafficMonitor
 
-Theos + Objective-C++/Logos 的 iOS 越狱网络监控工程。**目前交付第一阶段：指定进程注入基线，已通过 GitHub Actions Rootless 编译、包内容检查，以及 iPhone X / iOS 16.1.1 上三次冷启动的真实注入验证。HTTP、Socket、SQLite 和 WebUI 尚未实现。**
+Theos + Objective-C++/Logos 的 iOS 越狱网络监控工程。**当前开发版 0.2.0：第二阶段 NSURLSession dataTask completion 监控和异步诊断。当前版 CI/设备验证待执行；第一阶段 0.1.0 已有 Rootless 编译和真机注入证据。Socket、SQLite 和 WebUI 尚未实现。**
 
 私有仓库：[wwangmc/TrafficMonitor](https://github.com/wwangmc/TrafficMonitor)。[成功构建 #1](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548) · [Rootless 产物](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548/artifacts/12707061218) · [验证记录](docs/BUILD_VERIFICATION.md)。
 
-目标为 `com.korea.mrtgd2.ios`。加载入口只校验 Bundle ID、系统版本并输出一次日志：`stage=1 event=loaded ... capture=disabled`。不会主动发请求、监听端口或记录业务数据；不猜测目标可执行文件名，不自动杀进程。
+目标为 `com.korea.mrtgd2.ios`。检查 Bundle ID/系统版本后输出 `stage=2 event=loaded ... http_enabled=1`，被动记录受支持的 NSURLSession completion 路径。业务 Tweak 不主动发请求或监听端口；异步诊断文件位于 App 临时目录。字段、隐私、测试和覆盖限制见 [第二阶段说明](docs/STAGE2_NSURLSESSION.md)。
 
 ## 构建配置
 
@@ -68,7 +68,7 @@ GNU make 若命名为 `make` 可替换 `gmake`。更换 SDK 可传 `TM_SDK=<已�
 log stream --level info --predicate 'subsystem == "com.example.trafficmonitor"'
 ```
 
-没有设备端 `log` 时使用 macOS Console 连接设备观察。预期有 `event=loaded`、`bundle=com.korea.mrtgd2.ios`、实际 PID、对应 mode 和 `capture=disabled`。该日志仅证明本次初始化，不能证明网络监控能力。详细包内容、负例与卸载验证见 [设备验收步骤](docs/DEVICE_VALIDATION.md)。用包管理器移除，或 `dpkg -r com.example.trafficmonitor` 后重启目标 App；本阶段无数据库。
+没有设备端 `log` 时可用 macOS Console 或电脑 USB 统一日志工具。预期日志包含 `stage=2 event=loaded`、目标 Bundle/PID、mode 与 `http_enabled=1`，但日志只证明初始化；真实 HTTP 事件需查看 App 的 `tmp/TrafficMonitor/http-events.jsonl`。独立诊断工具和清理步骤见 [第二阶段说明](docs/STAGE2_NSURLSESSION.md)。卸载包后重启目标 App；临时文件需单独清理。
 
 ## 后续路线与数据边界
 

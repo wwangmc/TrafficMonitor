@@ -49,3 +49,9 @@
 - 本次未改插件源码、未安装/卸载软件、未重启设备；只结束并重新打开目标游戏两次，验证重复冷启动。
 
 当前状态：第一阶段 Rootless 构建、包检查与此设备上的基础注入验收通过。后续可进入 NSURLSession 监控实现；当前没有 HTTP/Socket 数据采集能力。
+
+## 2026-10-27 第二阶段开发（0.2.0）
+
+已实现 URL/Request dataTask completion、嵌套工厂去重、首次 resume 计时、事件/脱敏、256 槽位 trylock 队列、异步 JSONL 和两段轮转。附带同源 tm-probe，显式执行才使用 loopback fixture 验证 40 个合成 HTTP 任务和 queue 压力。CI 新增 macOS native probe，再编译 iOS 包。
+
+静态检查通过，实际 CI/真机结果待执行。delegate、upload/download、CFNetwork 和 Socket 未覆盖，详见 `STAGE2_NSURLSESSION.md`。

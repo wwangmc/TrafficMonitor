@@ -66,6 +66,14 @@ jobs:
             https://github.com/roothide/theos.git "$THEOS"
           git -C "$THEOS" rev-parse HEAD
 
+      - name: Run native HTTP integration probe
+        run: |
+          set -o pipefail
+          xcrun clang++ -std=c++17 -fobjc-arc -fblocks -framework Foundation \
+            probe/main.mm probe/TMFixture.mm Sources/TMHTTPMonitor.mm Sources/TMHTTPRecorder.mm \
+            -o "$RUNNER_TEMP/tm-probe-host"
+          "$RUNNER_TEMP/tm-probe-host" --self-test 2>&1 | tee probe-host.log
+
       - name: Install patched iOS 16.5 SDK
         run: |
           sdk_checkout="$RUNNER_TEMP/theos-sdks"
@@ -102,6 +110,7 @@ jobs:
           path: |
             packages/*.deb
             package-inspection.json
+            probe-host.log
           if-no-files-found: error
           retention-days: 14
 
@@ -111,6 +120,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log-${{ matrix.mode }}
-          path: build-${{ matrix.mode }}.log
+          path: |
+            build-${{ matrix.mode }}.log
+            probe-host.log
           if-no-files-found: ignore
           retention-days: 14

@@ -65,15 +65,17 @@ def inspect(path, scheme, archs, macho=False):
         raise ValueError(f"Unexpected package identity/architecture: {fields}")
     prefix = "var/jb/" if scheme == "rootless" else ""
     library = prefix + "Library/MobileSubstrate/DynamicLibraries/TrafficMonitor"
+    probe_path = prefix + "usr/libexec/trafficmonitor/tm-probe"
     with read_tar(members, "data") as data_tar:
         files = file_map(data_tar)
-        if set(files) != {library + ".dylib", library + ".plist"}:
-            raise ValueError(f"Unexpected stage-1 package payload: {sorted(files)}")
+        if set(files) != {library + ".dylib", library + ".plist", probe_path}:
+            raise ValueError(f"Unexpected stage-2 package payload: {sorted(files)}")
         actual_filter = plistlib.loads(data_tar.extractfile(files[library + ".plist"]).read())
         expected_filter = plistlib.loads((Path(__file__).resolve().parents[1] / "TrafficMonitor.plist").read_bytes())
         if actual_filter != expected_filter:
             raise ValueError("Packaged Filter differs from source")
         dylib = data_tar.extractfile(files[library + ".dylib"]).read()
+        probe = data_tar.extractfile(files[probe_path]).read()
     report = {"file": path.name, "sha256": hashlib.sha256(raw).hexdigest(),
               "size_bytes": len(raw), "scheme": scheme, "control": fields,
               "files": sorted(files), "filter": actual_filter}
@@ -90,6 +92,12 @@ def inspect(path, scheme, archs, macho=False):
                 raise ValueError(f"Rootful library dependency in Rootless build: {dependencies}")
             report.update(macho_archs=slices, dependencies=dependencies,
                           load_commands=subprocess.check_output(["otool", "-l", str(binary)], text=True))
+            probe_binary = Path(task_dir) / "tm-probe"
+            probe_binary.write_bytes(probe)
+            probe_slices = subprocess.check_output(["lipo", "-archs", str(probe_binary)], text=True).strip()
+            if set(probe_slices.split()) != {"arm64"}:
+                raise ValueError(f"Unexpected probe architecture: {probe_slices}")
+            report.update(probe_archs=probe_slices)
     return report
 
 

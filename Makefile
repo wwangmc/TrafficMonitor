@@ -26,8 +26,12 @@ endif
 include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = TrafficMonitor
-TrafficMonitor_FILES = Tweak.xm
+TrafficMonitor_FILES = Tweak.xm Sources/TMHTTPMonitor.mm Sources/TMHTTPRecorder.mm
 TrafficMonitor_CFLAGS = -fobjc-arc -DTM_ROOTLESS=$(TM_ROOTLESS)
+TrafficMonitor_CCFLAGS = -std=c++17
 TrafficMonitor_FRAMEWORKS = Foundation
 
 include $(THEOS_MAKE_PATH)/tweak.mk
+
+SUBPROJECTS += probe
+include $(THEOS_MAKE_PATH)/aggregate.mk

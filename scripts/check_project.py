@@ -28,7 +28,7 @@ def check(require_yaml=False):
     if failures:
         return failures
 
-    source_suffixes = {".h", ".xm", ".py", ".md", ".yml", ".plist"}
+    source_suffixes = {".h", ".xm", ".mm", ".py", ".md", ".yml", ".plist"}
     for path in ROOT.rglob("*"):
         relative = path.relative_to(ROOT)
         if any(part in {".git", ".theos", "packages", "__pycache__"}
@@ -63,6 +63,9 @@ def check(require_yaml=False):
                   "TrafficMonitor_FILES = Tweak.xm", "-DTM_ROOTLESS=$(TM_ROOTLESS)"):
         require(value in makefile, f"Missing build setting: {value}")
     require("INSTALL_TARGET_PROCESSES =" not in makefile, "No guessed process kill allowed")
+    for name in ("Sources/TMHTTP.h", "Sources/TMHTTPMonitor.mm", "Sources/TMHTTPRecorder.mm",
+                 "probe/Makefile", "probe/main.mm", "probe/TMFixture.mm"):
+        require((ROOT / name).is_file(), f"Missing stage-2 source: {name}")
     control = dict(line.split(": ", 1) for line in
                    (ROOT / "control").read_text(encoding="utf-8").splitlines() if ": " in line)
     for key in ("Package", "Name", "Version", "Architecture", "Description", "Maintainer", "Depends"):

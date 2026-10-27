@@ -1,8 +1,8 @@
 Package: com.example.trafficmonitor
 Name: TrafficMonitor
-Version: 0.1.0
+Version: 0.2.0
 Architecture: iphoneos-arm
-Description: TrafficMonitor stage 1 - target-process injection diagnostics only
+Description: NSURLSession data-task completion monitoring with bounded async diagnostics
 Maintainer: Developer
 Author: Developer
 Section: Tweaks
