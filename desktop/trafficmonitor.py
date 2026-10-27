@@ -340,7 +340,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 app = collector.selected[0]
             with store.lock:
                 requests = [dict(row) for row in store.db.execute(
-                    'SELECT url,up+down AS size FROM http WHERE app=? ORDER BY at DESC LIMIT 200', (app,))]
+                    'SELECT url,size FROM (SELECT url,up+down AS size,at FROM http WHERE app=? '
+                    'ORDER BY at DESC LIMIT 200) ORDER BY size IS NULL,size DESC,at DESC', (app,))]
             self.reply(200, {'app':app, 'requests':requests,
                             'apps':[{'id':a['id'],'name':a['name']} for a in collector.apps],
                             'connected':bool(collector.updated) and not bool(collector.error), 'error':collector.error})
