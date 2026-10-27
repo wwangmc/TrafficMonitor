@@ -1,0 +1,16 @@
+{
+  "version": "0.3.1",
+  "device": "iPhone X",
+  "os": "iOS 16.1.1",
+  "injection": "ElleKit 1.2 / Rootless",
+  "bundle_id": "com.korea.mrtgd2.ios",
+  "process_http_requests": 223,
+  "process_http_sources": {
+    "nsurlsession_delegate": 116,
+    "nsurlsession_completion": 107
+  },
+  "socket_samples": 90,
+  "socket_upload_bytes": 6926,
+  "socket_download_bytes": 92995,
+  "note": "One observed session; no coverage percentage; HTTP and Socket are independent."
+}

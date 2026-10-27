@@ -1,0 +1,323 @@
+{
+  "body_bytes_ok": true,
+  "callbacks": [
+    {
+      "callback_queue_preserved": true,
+      "case": "shared_session",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "default_session",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "get_url",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "post_request",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "http_404",
+      "error": 0,
+      "ok": true,
+      "status": 404
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_0",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "download_completion",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_1",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_2",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_3",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_4",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_5",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_7",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_8",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_6",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_9",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_10",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_11",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_12",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_13",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_14",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_15",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_16",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_17",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_18",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_19",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_20",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_21",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_22",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_23",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_24",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_25",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_26",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_27",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_28",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_29",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_30",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "concurrent_31",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "redirect",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "upload_data",
+      "error": 0,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "transport_error",
+      "error": -1005,
+      "ok": true,
+      "status": 0
+    },
+    {
+      "callback_queue_preserved": true,
+      "case": "cancel",
+      "error": -999,
+      "ok": true,
+      "status": 0
+    }
+  ],
+  "cancellation_ok": true,
+  "default_class": "__NSURLSessionLocal",
+  "delegate_path_unchanged": true,
+  "fields_ok": true,
+  "health": {
+    "attempted": 1077,
+    "capacity": 256,
+    "dropped_busy": 0,
+    "dropped_full": 768,
+    "peak_depth": 256,
+    "queued": 309,
+    "write_errors": 0,
+    "written": 309
+  },
+  "http_events": 43,
+  "permissions_ok": true,
+  "redaction_ok": true,
+  "redirect_ok": true,
+  "result": "PASS",
+  "session_class": "__NSURLSessionLocal",
+  "shared_baseline_dispatch_label": "com.apple.NSURLSession-delegate",
+  "shared_class": "__NSURLSessionLocal",
+  "socket_ok": true,
+  "unique_requests": 43
+}

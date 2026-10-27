@@ -1,3 +1,5 @@
+> 当前交付：0.3.1 已完成 HTTP、Socket、电脑 SQLite、USB WebUI 和 GitHub Actions。以下保留最初实施设计；最终桥接采用已有 MKS/roothelp，SQLite 与 Web 服务运行在电脑。兼容性与验收以 COMPATIBILITY.md / RELEASE_VERIFICATION.md 为准。
+
 # TrafficMonitor 实施计划
 
 日期：2026-10-27（Asia/Shanghai）。本轮范围：初始化与第一阶段。

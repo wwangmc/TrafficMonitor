@@ -1,0 +1,36 @@
+{
+  "sha256": "65421f9e17a3f1af696f5aadf9a878ec530196d55b6adbd5736758a680819580",
+  "size_bytes": 61098,
+  "scheme": "rootless",
+  "control": {
+    "Package": "com.example.trafficmonitor",
+    "Name": "TrafficMonitor",
+    "Description": "HTTP and socket monitoring with a local SQLite visual dashboard",
+    "Maintainer": "Developer",
+    "Author": "Developer",
+    "Section": "Tweaks",
+    "Depends": "mobilesubstrate",
+    "Architecture": "iphoneos-arm64",
+    "Version": "0.3.1",
+    "Installed-Size": "3216"
+  },
+  "files": [
+    "var/jb/Library/MobileSubstrate/DynamicLibraries/TrafficMonitor.dylib",
+    "var/jb/Library/MobileSubstrate/DynamicLibraries/TrafficMonitor.plist",
+    "var/jb/usr/libexec/trafficmonitor/tm-probe"
+  ],
+  "filter": {
+    "Filter": {
+      "Bundles": [
+        "com.korea.mrtgd2.ios"
+      ]
+    }
+  },
+  "macho_archs": "arm64 arm64e",
+  "probe_archs": "arm64",
+  "payload_sha256": {
+    "var/jb/Library/MobileSubstrate/DynamicLibraries/TrafficMonitor.dylib": "c2329db013f3797159098076f55641e78d297847b209397157538c4aa85ac21e",
+    "var/jb/Library/MobileSubstrate/DynamicLibraries/TrafficMonitor.plist": "62eea8242c5e788e653f94d788660d7f396c0904e306227a0ae1dd6e0d8d8cca",
+    "var/jb/usr/libexec/trafficmonitor/tm-probe": "328137b1c9e585632422dd59a20b1797ceded1ff5e3c3196be69d14870a8c84e"
+  }
+}

@@ -1,28 +1,34 @@
-# 覆盖与限制
+# 兼容性与实测边界
 
-0.2.0 已实现并验证 NSURLSession dataTask completion 路径，覆盖率仍未知。`com.korea.mrtgd2.ios` 包内发现 UnityFramework 与多个 SDK，实际捕获了该进程的 completion HTTPS 事件；没有调用栈证据，不能归因或推断全部网络栈。
+0.3.1 支持 NSURLSession 已验证路径及 BSD Socket 导入符号采集。覆盖率未知，不提供全游戏、全 API 或真实网卡流量承诺。
 
-| 路径 | 计划 | 必须验证的边界 |
+| 路径 | 当前实现 / 实测 | 限制 |
 | --- | --- | --- |
-| NSURLSession dataTask + completion | 已实现 URL/Request 入口；macOS/iOS 各 40 请求通过，游戏实际事件有正例 | 去重、回调队列、redirect/error/cancel 已测；缓存、stream 与自定义子类等未完整覆盖 |
-| delegate/upload/download/background | 第一条路径通过后单独扩展 | 不预读 stream；系统后台进程、下载文件与 metrics 时序另测 |
-| CFNetwork/CFHTTPStream | 后续独立适配 | NSURLSession 验证不代表全部 CFNetwork 覆盖 |
-| BSD TCP/UDP | connect/send/recv/sendto/recvfrom/sendmsg/recvmsg | 处理 fd 生命周期；read/write/readv/writev 等实际路径也可能需要覆盖；直接 syscall/其他进程可能遗漏 |
-| Network.framework / QUIC | 用样例验证进程及调用路径后再适配 | 不假设会经过上述 BSD hooks；UDP 或多路复用字节不能直接还原 HTTP 请求 |
-| libcurl | 检查动态/静态链接、transport，必要时独立适配 | 不假设进入 NSURLSession；自定义 socket、SSL backend、静态符号另测 |
-| Unity | 目标包中发现 UnityFramework，捕获同进程部分 NSURLSession HTTPS 事件 | 未确认事件来自 UnityWebRequest 还是 SDK；不承诺完整 Unity 覆盖，自有 UDP 另测 |
-| Unreal | 检查实际构建的 HTTP、Socket 与插件后端 | 不假设所有 iOS 构建都使用 NSURLSession 或同一种 curl 配置 |
-| WKWebView/扩展/系统进程 | 识别真实执行进程再评估 | 宿主注入不代表其他进程覆盖；不注入全系统以扩大数字 |
+| NSURLSession dataTask completion URL/Request | macOS/iOS 合成测试、目标游戏实际 HTTPS | redirect/error/cancel/并发/共享与普通 session 已测；自定义子类、缓存等未穷尽 |
+| delegate dataTask | 原 delegate 身份与回调保持，合成测试有正例 | 应用在装钩前创建的 session、动态替换 delegate 方法、后台系统进程不保证 |
+| upload data/file completion | data 有合成正例；不读取 file | file/stream body 未知；文件 upload 尚无独立真机用例 |
+| download completion | 合成正例，不读取下载文件 | body 字节未知，task 计数另列；resume-data/background 未覆盖 |
+| TCP/UDP IPv4/IPv6 | connect/send/recv/sendto/recvfrom/sendmsg/recvmsg，加 read/write/readv/writev/close/dup/dup2/accept；合成 TCP/UDP/IPv6 正例，游戏实际 TCP 正例 | 指动态导入符号，直接 syscall、私有变体、无法修改的导入段、未观察到的 API 会漏记；arm64e 仅编译未真机测 |
+| CFNetwork / CFHTTPStream | 暂无专用 HTTP hook | 底层若经过已挂钩导入可能产生 Socket 样本，不还原其 HTTP |
+| Network.framework / QUIC | 暂无专用 nw_connection 适配 | 不能假设全部经过公共 BSD 导入；本机游戏 HTTP 大文件与 Socket 样本字节明显不等，不能把 Socket 当完整总量 |
+| libcurl | 无 curl 专用 HTTP hook；普通动态 BSD 导入可能可观测 | 静态实现、自定义 transport/socket/TLS backend 未做 curl 实例验证，不宣称完整支持 |
+| Unity | 目标游戏存在 UnityFramework，0.3.1 可启动并出现实际 HTTP 与 TCP 样本 | 无调用栈归因，不把 SDK 请求归因为 UnityWebRequest，不推断全部游戏流量 |
+| Unreal | 只完成官方接口研究 | 具体构建后端未有真机样本，不承诺支持全部 Unreal 游戏 |
+| WKWebView/扩展/nsurlsessiond | 不注入其他进程 | 宿主 Bundle 过滤不覆盖独立执行进程 |
 
-## 初步资料与推论
+## 真机发现与实现选择
 
-2026-10-27 核对的官方入口：
+0.3.0 以 MSHookFunction 修改短 libc 函数，目标 Unity 游戏约 3 秒后 EXC_GUARD 退出；崩溃包含 ElleKit 异常端口循环和 Unity Breakpad ForwardException。不能仅凭合成 probe 通过交付此版本。
 
-- [Theos Rootless](https://theos.dev/docs/rootless)：scheme、前缀与包架构依据。
-- [ElleKit](https://github.com/tealbathingsuit/ellekit)：提供 Substrate/libhooker API 实现，不证明某个游戏可注入。
-- [Apple NSURLSession](https://developer.apple.com/documentation/foundation/urlsession) 与 [Network.framework](https://developer.apple.com/documentation/network)：后续按 API/任务模型拆分验证，尚未完成底层路径研究。
-- [libcurl CURLOPT_OPENSOCKETFUNCTION](https://curl.se/libcurl/c/CURLOPT_OPENSOCKETFUNCTION.html)：允许自定义 socket 创建及提供已连接 socket。因此不能只凭 connect 推断 curl 连接完整性；这是设计推论，无本项目实测。
-- [Unity 请求手册](https://docs.unity3d.com/Manual/web-request.html)：不据此推断 iOS 底层 transport。
-- [Unreal FGenericPlatformHttp](https://dev.epicgames.com/documentation/unreal-engine/API/Runtime/HTTP/FGenericPlatformHttp)：存在平台相关 HTTP 实现；具体 iOS 游戏后端仍需代码/二进制与真机验证。
+0.3.1 改用带许可证的 fishhook 导入符号重绑定，避免指令跳板/异常端口。对应用和后续 image 的可处理导入段重绑定，保留原函数和 errno，自身 worker 导入排除。目标游戏重新启动进入主界面并产出 TCP 样本。符号重绑定也有覆盖边界，尤其 arm64e authenticated/chained fixup 并未在真机确认。
 
-具体第二阶段证据见 STAGE2_VERIFICATION.md。后续继续研究 Network.framework、CFNetwork 和引擎具体实现。当前没有协议解密、反作弊绕过、内核抓包或真实接口流量统计。
+## 官方资料与推论（2026-10-27 复核）
+
+- [Apple Network.framework](https://developer.apple.com/documentation/network)：独立网络 API。没有 nw_connection 专用探针，不能从其存在推断 BSD 覆盖。
+- [libcurl CURLOPT_OPENSOCKETFUNCTION](https://curl.se/libcurl/c/CURLOPT_OPENSOCKETFUNCTION.html)：明确允许自定义创建 socket、返回已经连接的 socket；据此推论不能只监控 connect 来证明全部 curl 流量覆盖。
+- [Unity Web 请求手册](https://docs.unity3d.com/Manual/web-request.html)：介绍 UnityWebRequest 的传输能力；不能据此确定某游戏的具体 iOS transport。目标样本可能来自内嵌 SDK。
+- [Unreal FGenericPlatformHttp](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/HTTP/FGenericPlatformHttp)：平台相关请求构造与管理；具体游戏需要对实际构建验证。
+- [fishhook](https://github.com/facebook/fishhook)：动态导入重绑定机制，和内核抓包有不同覆盖范围。
+- [Theos Rootless](https://theos.dev/docs/rootless)、[ElleKit](https://github.com/tealbathingsuit/ellekit)：安装前缀与注入环境依据，不代表任意游戏的兼容性保证。
+
+没有 TLS 解密、证书绕过、反作弊绕过、系统全局抓包或真实接口流量统计。Rootful iOS 14 为独立预留构建，尚无真机验收；Dopamine 目标为 iOS 15+ Rootless。
