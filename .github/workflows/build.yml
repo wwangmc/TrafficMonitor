@@ -1,0 +1,116 @@
+# Stage 1 scaffold: no successful CI build has been recorded yet.
+name: Build Theos packages
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: theos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Package (${{ matrix.mode }})
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: rootless
+            type: 1
+            archs: arm64 arm64e
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      BUILD_TYPE: ${{ matrix.type }}
+      BUILD_ARCHS: ${{ matrix.archs }}
+      BUILD_MODE: ${{ matrix.mode }}
+
+    steps:
+      - name: Set build environment
+        run: echo "THEOS=$RUNNER_TEMP/theos" >> "$GITHUB_ENV"
+
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Install build tools
+        run: |
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+          brew install make ldid xz
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Validate project metadata
+        run: |
+          python3 -m venv "$RUNNER_TEMP/trafficmonitor-check"
+          "$RUNNER_TEMP/trafficmonitor-check/bin/python" -m pip install PyYAML==6.0.3
+          "$RUNNER_TEMP/trafficmonitor-check/bin/python" scripts/check_project.py --require-yaml --environment
+
+      - name: Install RootHide Theos
+        run: |
+          git clone --recursive --depth 1 --branch master \
+            https://github.com/roothide/theos.git "$THEOS"
+          git -C "$THEOS" rev-parse HEAD
+
+      - name: Install patched iOS 16.5 SDK
+        run: |
+          sdk_checkout="$RUNNER_TEMP/theos-sdks"
+          git clone --depth 1 --filter=blob:none --sparse --branch master \
+            https://github.com/theos/sdks.git "$sdk_checkout"
+          git -C "$sdk_checkout" sparse-checkout set iPhoneOS16.5.sdk
+          mkdir -p "$THEOS/sdks"
+          cp -R "$sdk_checkout/iPhoneOS16.5.sdk" "$THEOS/sdks/"
+          test -f "$THEOS/sdks/iPhoneOS16.5.sdk/SDKSettings.plist"
+          git -C "$sdk_checkout" rev-parse HEAD
+
+      - name: Build deb package
+        run: |
+          set -o pipefail
+          make TYPE="$BUILD_TYPE" ARCHS="$BUILD_ARCHS" clean \
+            2>&1 | tee "build-$BUILD_MODE.log"
+          make -j"$(sysctl -n hw.ncpu)" TYPE="$BUILD_TYPE" \
+            ARCHS="$BUILD_ARCHS" FINALPACKAGE=1 package \
+            2>&1 | tee -a "build-$BUILD_MODE.log"
+
+      - name: Inspect deb architecture, paths and Filter
+        run: |
+          set -o pipefail
+          package_files=(packages/*.deb)
+          test "${#package_files[@]}" -eq 1
+          "$RUNNER_TEMP/trafficmonitor-check/bin/python" scripts/inspect_deb.py \
+            "${package_files[0]}" --scheme rootless --macho \
+            2>&1 | tee package-inspection.json
+
+      - name: Upload deb package
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrafficMonitor-${{ matrix.mode }}
+          path: |
+            packages/*.deb
+            package-inspection.json
+          if-no-files-found: error
+          retention-days: 14
+
+
+      - name: Upload build log
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.mode }}
+          path: build-${{ matrix.mode }}.log
+          if-no-files-found: ignore
+          retention-days: 14

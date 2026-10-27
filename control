@@ -1,0 +1,9 @@
+Package: com.example.trafficmonitor
+Name: TrafficMonitor
+Version: 0.1.0
+Architecture: iphoneos-arm
+Description: TrafficMonitor stage 1 - target-process injection diagnostics only
+Maintainer: Developer
+Author: Developer
+Section: Tweaks
+Depends: mobilesubstrate
