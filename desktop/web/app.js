@@ -1,25 +1,96 @@
-'use strict';
-const $=id=>document.getElementById(id),NS='http://www.w3.org/2000/svg';
-let data=null,page='overview',editing=new Set(),busy=false;
-function node(tag,text,cls){const x=document.createElement(tag);if(text!==undefined)x.textContent=text;if(cls)x.className=cls;return x;}
-function bytes(n){if(n===null||n===undefined)return '—';if(n<1024)return Math.round(n)+' B';const u=['KB','MB','GB'];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<2);return n.toFixed(n<10?2:1)+' '+u[i];}
-const num=n=>(n||0).toLocaleString(),clock=t=>new Date(t*1000).toLocaleTimeString('zh-CN',{hour12:false});
-function toast(text){$('toast').textContent=text;$('toast').hidden=false;setTimeout(()=>$('toast').hidden=true,4200);}
-async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});const j=await r.json();if(!r.ok)throw Error(j.error||'操作失败');return j;}
-function appName(id){return data?.apps.find(a=>a.id===id)?.name||id;}
-function empty(element,text){element.replaceChildren(node('div',text,'empty'));}
-function table(target,headers,rows){const t=node('table'),h=node('thead'),hr=node('tr');headers.forEach(x=>hr.append(node('th',x)));h.append(hr);const b=node('tbody');rows.forEach(row=>b.append(row));t.append(h,b);target.replaceChildren(t);if(!rows.length)empty(target,'暂无数据 · 请确认已安装最新版插件，并重新打开所选应用');}
-function requestRows(items){return items.map(r=>{const row=node('tr',undefined,'request-row');row.onclick=()=>details(r.id);const method=node('td');method.append(node('span',r.method,'method '+(r.method==='POST'?'post':'')));const status=node('td');status.append(node('span',r.status??'无响应','badge '+(!r.status||r.status>=400?'error':'')));row.append(node('td',clock(r.at)),method,node('td',r.url,'url'),status,node('td',r.duration==null?'—':Math.round(r.duration)+' ms'),node('td',bytes(r.up)+' / '+bytes(r.down)));return row;});}
-function renderRequests(){if(!data)return;let items=data.requests;const filter=$('statusFilter').value;if(filter==='error')items=items.filter(r=>!r.status||r.status>=400);if(filter==='success')items=items.filter(r=>r.status&&r.status<400);table($('requestsTable'),['时间','方法','脱敏 URL','状态','耗时','应用 body ↑ / ↓'],requestRows(items));table($('recentRequests'),['时间','方法','脱敏 URL','状态','耗时','应用 body ↑ / ↓'],requestRows(data.requests.slice(0,6)));}
-function rank(target,items,ip=false){if(!items.length){empty(target,ip?'等待 Socket 端点样本':'等待 HTTP 请求');return;}const max=Math.max(1,...items.map(r=>ip?r.up+r.down:r.requests));target.replaceChildren();items.slice(0,6).forEach(r=>{const x=node('div',undefined,'rank-row '+(ip?'ip':''));const value=ip?r.up+r.down:r.requests;x.append(node('span',ip?r.ip+' · '+r.protocol:r.domain,'name'),node('span',ip?bytes(value):num(value)+' 次','value'));const bar=node('div',undefined,'bar'),fill=node('span',undefined,'fill');fill.style.width=Math.max(2,value/max*100)+'%';bar.append(fill);x.append(bar);target.append(x);});}
-function renderChart(){const svg=$('chart');svg.replaceChildren();const points=data.graph,bucket=data.bucket||1,now=data.now,window=data.window;const map=new Map(points.map(p=>[p.t,p]));const samples=[];const step=Math.max(bucket,Math.ceil(window/120));for(let t=Math.floor((now-window)/step)*step;t<=now;t+=step){let up=0,down=0;for(const p of points)if(p.t>=t&&p.t<t+step){up+=p.up;down+=p.down;}samples.push({up:up/step,down:down/step});}let max=Math.max(1024,...samples.map(p=>Math.max(p.up,p.down)))*1.18;$('chartAxis').replaceChildren(node('span',bytes(max)+'/s'),node('span',bytes(max/2)+'/s'),node('span','0'));for(let y=0;y<=190;y+=47.5){const l=document.createElementNS(NS,'line');Object.entries({x1:0,x2:1000,y1:y,y2:y,stroke:'#ecf0f5','stroke-dasharray':'3 5'}).forEach(([k,v])=>l.setAttribute(k,v));svg.append(l);}['down','up'].forEach((key,i)=>{const path=samples.map((p,n)=>(n?'L':'M')+(n/Math.max(1,samples.length-1)*1000).toFixed(1)+','+(190-p[key]/max*180).toFixed(1)).join(' ');const area=document.createElementNS(NS,'path');area.setAttribute('d',path+' L1000,190 L0,190 Z');area.setAttribute('fill',i?'#58c4aa14':'#a09ae414');svg.append(area);const line=document.createElementNS(NS,'path');line.setAttribute('d',path);line.setAttribute('fill','none');line.setAttribute('stroke',i?'#45b59a':'#9286d7');line.setAttribute('stroke-width','2.4');line.setAttribute('vector-effect','non-scaling-stroke');svg.append(line);});$('chartEmpty').hidden=points.length>0;$('chartStart').textContent=clock(now-window);$('chartPeak').textContent='峰值 '+bytes(max/1.18)+'/s';}
-function renderConnections(){const proto=$('protocolFilter').value,items=data.connections.filter(x=>proto==='all'||x.protocol===proto);const rows=items.map(c=>{const r=node('tr'),s=node('td');const state=c.state==='closed'?'已关闭':c.state==='failed'?'连接失败':c.state==='pending'?'连接中':data.now-c.last>60?'闲置':'活动';s.append(node('span',state,'badge '+(c.state==='closed'?'closed':c.state==='failed'?'error':'')));r.append(node('td',c.protocol),node('td',(c.ip.includes(':')?'['+c.ip+']':c.ip)+':'+c.port),node('td',appName(c.app)),node('td',bytes(c.up)),node('td',bytes(c.down)),node('td',clock(c.last)),s);return r;});table($('connectionsTable'),['协议','远程 IP / 端口','应用','会话累计 ↑','会话累计 ↓','最近活动','状态'],rows);}
-function renderHealth(){const target=$('health');target.replaceChildren();if(!data.health.length){empty(target,'尚未收到采集健康报告');return;}for(const h of data.health){const d=h.detail,http=d.http||{},s=d.socket||{};const row=node('div',undefined,'health-row');row.append(node('span',appName(h.app)),node('span','事件队列丢弃 '+num((http.dropped_full||0)+(http.dropped_busy||0))+' · Socket 丢弃 '+num(s.dropped)+' · 写入错误 '+num(http.write_errors)));target.append(row);}}
-function render(){const d=data;$('connectionStatus').textContent=d.connected?(d.paused?'采集已暂停':'● USB 已连接'):'设备连接异常';$('connectionStatus').classList.toggle('bad',!d.connected);$('errorBanner').hidden=!d.error;$('errorBanner').textContent=d.error?'设备读取未完成：'+d.error+'。已保存的历史仍可查看。':'';$('pauseBtn').textContent=d.paused?'恢复采集':'暂停采集';$('updated').textContent=d.updated?'更新于 '+clock(d.updated):'等待设备同步';$('upRate').textContent=bytes(d.rate.up)+'/s';$('downRate').textContent=bytes(d.rate.down)+'/s';$('upTotal').textContent='窗口累计上传 '+bytes(d.totals.up);$('downTotal').textContent='窗口累计下载 '+bytes(d.totals.down);$('requestCount').textContent=num(d.totals.requests);$('requestMeta').textContent=num(d.totals.errors)+' 条错误 / 无响应 · 平均 '+Math.round(d.totals.latency||0)+' ms';$('connectionCount').textContent=d.active;$('retention').value=d.retention_days;const current=$('appFilter').value,ids=[...new Set([...d.selected,...(d.historical_apps||[])])],options=ids.map(id=>({id,name:appName(id)}));$('appFilter').replaceChildren(new Option('全部监控应用',''),...options.map(a=>new Option(a.name,a.id)));$('appFilter').value=options.some(a=>a.id===current)?current:'';renderChart();rank($('domains'),d.domains);rank($('ips'),d.ips,true);renderRequests();renderConnections();renderHealth();}
-async function refresh(){if(busy)return;busy=true;try{data=await api('/api/state?'+new URLSearchParams({app:$('appFilter').value,range:$('range').value,search:$('requestSearch').value}));render();}catch(e){$('errorBanner').textContent=e.message;$('errorBanner').hidden=false;}finally{busy=false;}}
-function navigate(next){page=next;['overview','requests','connections','history'].forEach(p=>$(p+'Page').hidden=p!==next);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===next));$('pageTitle').textContent={overview:'网络总览',requests:'HTTP 请求',connections:'Socket 连接',history:'历史与存储'}[next];}
-async function details(id){try{const r=await api('/api/request?id='+encodeURIComponent(id));$('detailTitle').textContent=(r.method||'')+' · '+(r.status_code??'无 HTTP 响应');const names={url:'请求 URL（已脱敏）',final_url:'最终 URL',source:'采集路径',bundle_id:'应用',pid:'进程 PID',duration_ms:'resume → 完成（ms）',status_code:'HTTP 状态',request_body_bytes:'请求 body 快照（B）',response_body_bytes:'响应应用数据（B）',task_count_bytes_sent:'NSURLSession 自报上行（B）',task_count_bytes_received:'NSURLSession 自报下行（B）',error_domain:'错误域',error_code:'错误码',request_id:'请求 ID'};$('detailContent').replaceChildren();for(const [k,label]of Object.entries(names)){const row=node('div',undefined,'detail-row');row.append(node('span',label),node('div',r[k]??'—'));$('detailContent').append(row);}$('detailDialog').showModal();}catch(e){toast(e.message);}}
-function renderApps(){const query=$('appSearch').value.toLowerCase();$('appsList').replaceChildren();for(const a of data?.apps||[]){if(!(a.name+a.id).toLowerCase().includes(query))continue;const label=node('label',undefined,'app-choice'),check=document.createElement('input');check.type='checkbox';check.checked=editing.has(a.id);check.onchange=()=>{if(check.checked&&editing.size>=8){check.checked=false;toast('最多选择 8 个应用');return;}check.checked?editing.add(a.id):editing.delete(a.id);$('selectedCount').textContent='已选择 '+editing.size+' / 8';};const text=node('div');text.append(node('strong',a.name),node('small',a.id));label.append(check,text);$('appsList').append(label);}$('selectedCount').textContent='已选择 '+editing.size+' / 8';}
-async function config(value){try{const r=await api('/api/config',value);toast(r.message);$('notice').hidden=false;$('notice').textContent='配置已保存。新增监控应用需完全退出并重新打开；暂停与恢复将在 USB 同步后对运行中的采集生效。';await refresh();}catch(e){toast(e.message);}}
-async function exportData(){try{const r=await api('/api/export?'+new URLSearchParams({app:$('appFilter').value,range:$('range').value,search:$('requestSearch').value}));const blob=new Blob([JSON.stringify(r,null,2)],{type:'application/json'}),a=node('a');a.href=URL.createObjectURL(blob);a.download='TrafficMonitor-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}catch(e){toast(e.message);}}
-document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('appFilter').onchange=refresh;$('range').onchange=refresh;$('statusFilter').onchange=renderRequests;$('protocolFilter').onchange=renderConnections;let searchTimer;$('requestSearch').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(refresh,250);};$('manageAppsTop').onclick=$('manageApps').onclick=()=>{editing=new Set(data?.selected||[]);renderApps();$('appsDialog').showModal();};$('appSearch').oninput=renderApps;$('closeApps').onclick=()=>$('appsDialog').close();$('closeDetail').onclick=()=>$('detailDialog').close();$('saveApps').onclick=async()=>{await config({selected:[...editing]});$('appsDialog').close();};$('pauseBtn').onclick=()=>config({paused:!data?.paused});$('retention').onchange=()=>config({retention_days:Number($('retention').value)});$('exportBtn').onclick=$('historyExport').onclick=exportData;$('clearBtn').onclick=async()=>{if(!confirm('清理全部采集记录？此操作会删除历史数据，并回收数据库空间。'))return;try{const r=await api('/api/clear',{confirm:'CLEAR'});toast(r.message);await refresh();}catch(e){toast(e.message);}};refresh();setInterval(refresh,1000);
+"use strict";
+const $ = id => document.getElementById(id);
+let activeApp = "", appsSignature = "", busy = false, saving = false, version = 0;
+
+async function api(path, body) {
+  const response = await fetch(path, {
+    method: body ? "POST" : "GET",
+    headers: body ? {"Content-Type": "application/json"} : {},
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await response.json();
+  if (!response.ok) throw Error(data.error || "操作失败");
+  return data;
+}
+
+function sizeLabel(value) {
+  if (value === null || !Number.isFinite(value)) return "未知";
+  if (value < 1024) return value + " B";
+  for (const unit of ["KB", "MB", "GB", "TB"]) {
+    value /= 1024;
+    if (value < 1024 || unit === "TB") return value.toFixed(value < 10 ? 2 : 1) + " " + unit;
+  }
+}
+
+function render(data) {
+  if (!activeApp) activeApp = data.app || "";
+  const signature = JSON.stringify(data.apps);
+  if (signature !== appsSignature) {
+    appsSignature = signature;
+    const choices = data.apps.map(app => new Option(app.name + " · " + app.id, app.id));
+    $("appSelect").replaceChildren(new Option("请选择一个应用", ""), ...choices);
+  }
+  $("appSelect").value = activeApp;
+  $("appSelect").disabled = saving || !data.apps.length;
+  $("status").textContent = data.connected ? "● 设备已连接" : "等待设备连接";
+  $("error").hidden = !data.error || data.error === "正在连接设备";
+  $("error").textContent = data.error ? "设备读取未完成：" + data.error : "";
+  const rows = data.requests.map(request => {
+    const row = document.createElement("tr");
+    const urlCell = document.createElement("td"), url = document.createElement("span");
+    url.className = "url";
+    url.textContent = request.url;
+    url.title = request.url;
+    urlCell.append(url);
+    const size = document.createElement("td");
+    size.className = "size" + (request.size === null ? " unknown" : "");
+    size.textContent = sizeLabel(request.size);
+    if (request.size !== null) size.title = request.size + " 字节";
+    row.append(urlCell, size);
+    return row;
+  });
+  $("requestRows").replaceChildren(...rows);
+  $("empty").hidden = rows.length > 0;
+  $("empty").textContent = activeApp ? "暂无请求，请重新打开所选应用并产生网络活动。" : "请选择需要监控的应用。";
+}
+
+async function refresh() {
+  if (busy || saving) return;
+  busy = true;
+  const current = version;
+  try {
+    const data = await api("/api/requests?" + new URLSearchParams({app: activeApp}));
+    if (current === version) render(data);
+  } catch (error) {
+    if (current === version) {
+      $("error").textContent = error.message;
+      $("error").hidden = false;
+    }
+  } finally { busy = false; }
+}
+
+$("appSelect").onchange = async () => {
+  const chosen = $("appSelect").value;
+  if (!chosen || chosen === activeApp) { $("appSelect").value = activeApp; return; }
+  const previous = activeApp;
+  activeApp = chosen;
+  ++version;
+  saving = true;
+  $("appSelect").disabled = true;
+  $("requestRows").replaceChildren();
+  $("empty").hidden = false;
+  $("empty").textContent = "正在切换监控应用…";
+  try {
+    await api("/api/config", {selected: [chosen], paused: false});
+    $("hint").textContent = "已选择该应用。请完全退出并重新打开该应用，随后请求会自动显示。";
+  } catch (error) {
+    activeApp = previous;
+    $("hint").textContent = "切换失败：" + error.message;
+  } finally {
+    saving = false;
+    $("appSelect").disabled = false;
+    await refresh();
+  }
+};
+refresh();
+setInterval(refresh, 1000);

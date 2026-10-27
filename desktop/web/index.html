@@ -1,16 +1,26 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TrafficMonitor · 网络观测台</title><link rel="stylesheet" href="/style.css"></head>
-<body><aside class="sidebar"><a class="brand" href="/">◈ <span>TrafficMonitor<small>网络观测台</small></span></a><p class="nav-label">工作空间</p><nav><button data-page="overview" class="active">◫ <span>总览</span></button><button data-page="requests">↗ <span>HTTP 请求</span></button><button data-page="connections">⇄ <span>Socket 连接</span></button><button data-page="history">◷ <span>历史与存储</span></button></nav><div class="sidebar-bottom"><span class="live-dot"></span> 本地 · USB 直连<p>数据保留在你的电脑<br>127.0.0.1 / SQLite</p><button id="manageApps">＋ 管理监控应用</button></div></aside>
-<div class="workspace"><header><div><span class="eyebrow">TRAFFIC INTELLIGENCE</span><h1 id="pageTitle">网络总览</h1></div><div class="header-right"><span id="connectionStatus" class="status">正在连接设备…</span><button id="pauseBtn" class="button">暂停采集</button></div></header>
-<main><div class="toolbar"><div class="select-wrap"><span>监控应用</span><select id="appFilter"><option value="">全部监控应用</option></select></div><div class="select-wrap"><span>时间范围</span><select id="range"><option value="300">最近 5 分钟</option><option value="3600">最近 1 小时</option><option value="86400">最近 24 小时</option><option value="604800">最近 7 天</option></select></div><button id="manageAppsTop" class="button">＋ 监控应用</button><span id="updated">等待首次同步</span><button id="exportBtn" class="button">↓ 导出当前视图</button></div>
-<div id="notice" class="notice" hidden></div><div id="errorBanner" class="error-banner" hidden></div>
-<section class="cards"><article><span>Socket 上传速度 <i class="teal">↑</i></span><strong id="upRate">—</strong><small id="upTotal">等待连接数据</small></article><article><span>Socket 下载速度 <i class="violet">↓</i></span><strong id="downRate">—</strong><small id="downTotal">等待连接数据</small></article><article><span>HTTP 请求 <i class="blue">↗</i></span><strong id="requestCount">—</strong><small id="requestMeta">独立于 Socket 字节统计</small></article><article><span>最近活跃会话 <i class="amber">◉</i></span><strong id="connectionCount">—</strong><small>最近 60 秒发生 I/O 的 Socket</small></article></section>
-<section id="overviewPage" class="page"><article class="panel chart-panel"><div class="panel-heading"><div><h2>流量趋势</h2><p>用户态 Socket API 字节 · 2 秒滑动速度</p></div><div class="legend"><span class="teal">● 上传</span><span class="violet">● 下载</span><span id="chartPeak"></span></div></div><div class="chart"><div id="chartAxis"></div><svg id="chart" viewBox="0 0 1000 190" preserveAspectRatio="none" aria-label="Socket 上传下载速度趋势"></svg><div id="chartEmpty" class="chart-empty">等待 Socket 数据<span>打开已选择的应用并产生网络活动</span></div></div><div class="chart-footer"><span id="chartStart">—</span><span>以采集时间对齐设备时钟</span><span>现在</span></div></article>
-<div class="two-columns"><article class="panel"><div class="panel-heading"><div><h2>请求来源</h2><p>按域名汇总 · HTTP 请求次数</p></div><span class="tag">HTTP</span></div><div id="domains" class="rank-list"></div></article><article class="panel"><div class="panel-heading"><div><h2>远程端点</h2><p>按 IP 汇总 · 时间窗口内 Socket 字节</p></div><span class="tag">TCP / UDP</span></div><div id="ips" class="rank-list"></div></article></div>
-<article class="panel"><div class="panel-heading"><div><h2>最近请求</h2><p>方法、脱敏 URL、响应与耗时</p></div><button class="text-button" data-page="requests">查看全部 →</button></div><div id="recentRequests" class="table-wrap"></div></article></section>
-<section id="requestsPage" class="page" hidden><article class="panel"><div class="panel-heading"><div><h2>HTTP 请求流</h2><p>最近 200 条匹配记录；点击查看详情；— 表示未知</p></div><div class="filters"><input id="requestSearch" placeholder="搜索 URL 或请求方法" aria-label="搜索请求"><select id="statusFilter"><option value="all">全部状态</option><option value="success">2xx / 3xx</option><option value="error">错误 / 无响应</option></select></div></div><div id="requestsTable" class="table-wrap"></div></article></section>
-<section id="connectionsPage" class="page" hidden><article class="panel"><div class="panel-heading"><div><h2>Socket 会话</h2><p>每个描述符及远程端点单独展示，字节为该会话累计值</p></div><select id="protocolFilter"><option value="all">TCP + UDP</option><option value="TCP">仅 TCP</option><option value="UDP">仅 UDP</option></select></div><div id="connectionsTable" class="table-wrap"></div></article></section>
-<section id="historyPage" class="page" hidden><article class="panel storage"><div><span class="eyebrow">YOUR DATA, YOUR DEVICE</span><h2>历史数据与采集设置</h2><p>HTTP 请求与 Socket 样本分别存入 SQLite。保留期之外的数据自动清理，每类事件最多保留 100,000 条。</p></div><div class="setting-row"><div><h3>自动保留期限</h3><p>同时约束 HTTP 请求与 Socket 历史样本</p></div><select id="retention"><option value="1">1 天</option><option value="3">3 天</option><option value="7">7 天</option></select></div><div class="setting-row"><div><h3>数据导出</h3><p>导出所选时间窗口的汇总及最近 200 条匹配请求 / 会话</p></div><button id="historyExport" class="button">导出 JSON</button></div><div class="setting-row"><div><h3>清理全部记录</h3><p>删除 SQLite 记录并回收 WAL；手机诊断文件随 USB 同步清理</p></div><button id="clearBtn" class="button danger">清理记录</button></div><h3>采集健康状态</h3><div id="health"></div></article></section>
-<footer><span>◈ TrafficMonitor 0.3.1</span><span>HTTP 应用数据与 Socket 字节分开统计。Socket API 字节不等同于真实链路流量。</span></footer></main></div>
-<dialog id="appsDialog"><div class="dialog-heading"><div><span class="eyebrow">APPLICATIONS</span><h2>选择监控应用</h2><p>最多 8 个；新增选择后需完全退出并重新打开应用</p></div><button class="close" id="closeApps">×</button></div><input id="appSearch" placeholder="搜索应用名称或 Bundle ID"><div id="appsList" class="apps-list"></div><div class="dialog-footer"><span id="selectedCount"></span><button id="saveApps" class="button primary">保存监控应用</button></div></dialog>
-<dialog id="detailDialog"><div class="dialog-heading"><div><span class="eyebrow">REQUEST DETAILS</span><h2 id="detailTitle">请求详情</h2></div><button class="close" id="closeDetail">×</button></div><div id="detailContent"></div></dialog>
-<div id="toast" role="status" hidden></div><script src="/app.js"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TrafficMonitor · 请求列表</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header><h1><span class="logo">↗</span> TrafficMonitor</h1><span id="status" role="status">正在连接设备…</span></header>
+    <section class="app-picker">
+      <label for="appSelect">监控应用</label>
+      <select id="appSelect" disabled><option value="">正在读取应用…</option></select>
+      <p id="hint">切换应用后，请完全退出并重新打开该应用。</p>
+    </section>
+    <p id="error" role="alert" hidden></p>
+    <section class="requests" aria-label="请求列表">
+      <table><thead><tr><th>请求 URL</th><th class="size">大小</th></tr></thead><tbody id="requestRows"></tbody></table>
+      <p id="empty">正在加载请求…</p>
+    </section>
+    <footer>最近 200 条请求，自动更新。大小为请求与响应的应用数据合计；URL 参数值已脱敏。鼠标悬停可查看完整 URL。</footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

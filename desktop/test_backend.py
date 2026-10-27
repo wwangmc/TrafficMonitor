@@ -73,6 +73,27 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(self.store.state()['totals']['requests'],0)
         self.assertEqual(self.store.cursors(),{})
 
+    def test_simple_request_list_scopes_app_and_preserves_unknown_size(self):
+        self.seed()
+        self.collector.selected=['com.example.test']
+        with self.store.lock:
+            self.store.db.execute('INSERT INTO http SELECT ?,app,at,method,?,domain,status,duration,?,?,source,detail FROM http WHERE id=?',
+                                  ('known','https://example.com/known',10,25,'request-1'))
+            self.store.db.execute('INSERT INTO http SELECT ?,?,at,method,?,domain,status,duration,?,?,source,detail FROM http WHERE id=?',
+                                  ('other','com.example.other','https://example.com/other',100,200,'request-1'))
+            self.store.db.commit()
+        status,body,_=self.call('/api/requests')
+        data=json.loads(body)
+        self.assertEqual(status,200)
+        self.assertEqual(data['app'],'com.example.test')
+        sizes={r['url']:r['size'] for r in data['requests']}
+        self.assertEqual(sizes['https://example.com/known'],35)
+        self.assertIsNone(sizes['https://example.com/path?token=%3Credacted%3E'])
+        self.assertNotIn('https://example.com/other',sizes)
+        self.assertNotIn('rate',data)
+        status,body,_=self.call('/api/requests?app=com.example.other')
+        self.assertEqual(json.loads(body)['requests'],[{'url':'https://example.com/other','size':300}])
+
     def test_history_and_parameter_binding(self):
         self.seed()
         self.assertEqual(self.call('/api/state?app=%27%20OR%201%3D1--')[0],200)

@@ -334,7 +334,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.reply(200, (ROOT / 'web' / name).read_bytes(), content); return
         collector, store = self.server.collector, self.server.collector.store
         query = urllib.parse.parse_qs(parsed.query)
-        if parsed.path == '/api/state':
+        if parsed.path == '/api/requests':
+            app = query.get('app', [collector.selected[0] if collector.selected else ''])[0]
+            if not app and collector.selected:
+                app = collector.selected[0]
+            with store.lock:
+                requests = [dict(row) for row in store.db.execute(
+                    'SELECT url,up+down AS size FROM http WHERE app=? ORDER BY at DESC LIMIT 200', (app,))]
+            self.reply(200, {'app':app, 'requests':requests,
+                            'apps':[{'id':a['id'],'name':a['name']} for a in collector.apps],
+                            'connected':bool(collector.updated) and not bool(collector.error), 'error':collector.error})
+        elif parsed.path == '/api/state':
             try:
                 seconds = max(60, min(604800, int(query.get('range',['300'])[0])))
                 state = store.state(query.get('app',[''])[0], seconds, query.get('search',[''])[0])

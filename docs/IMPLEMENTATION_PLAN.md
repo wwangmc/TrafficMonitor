@@ -1,3 +1,5 @@
+> 界面后续精简：仅保留单应用选择和请求URL/大小列表；自动更新最近200条。大小为请求与响应应用数据合计，未知保留未知。下文多面板描述对应历史版本。
+
 > 后续调整：按用户要求已移除本地 WebUI 访问令牌与登录，保留127.0.0.1和Host/Origin限制。下文认证设计仅为历史方案。
 
 > 当前交付：0.3.1 已完成 HTTP、Socket、电脑 SQLite、USB WebUI 和 GitHub Actions。以下保留最初实施设计；最终桥接采用已有 MKS/roothelp，SQLite 与 Web 服务运行在电脑。兼容性与验收以 COMPATIBILITY.md / RELEASE_VERIFICATION.md 为准。
