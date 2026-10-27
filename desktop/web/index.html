@@ -28,6 +28,12 @@
     </section>
     <footer id="footnote">最近 200 条请求，按大小从大到小排列，未知大小放在最后，自动更新。大小为请求与响应的应用数据合计；URL 参数值已脱敏。鼠标悬停可查看完整 URL。</footer>
   </main>
+  <dialog id="deleteDialog" aria-labelledby="deleteTitle">
+    <h2 id="deleteTitle">删除当前应用记录？</h2>
+    <p id="deleteDescription"></p>
+    <p>此操作不可恢复，不影响其他应用。新的请求仍会继续记录。</p>
+    <div class="dialog-actions"><button id="cancelDelete">取消</button><button id="confirmDelete" class="delete">确认删除</button></div>
+  </dialog>
   <script src="/app.js"></script>
 </body>
 </html>

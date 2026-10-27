@@ -31,4 +31,9 @@ tbody tr:hover{background:#f8fcfa}
 #empty{text-align:center;margin:0;padding:65px 24px;color:#78879a;line-height:1.8}
 footer{color:#8190a2;font-size:11px;line-height:1.8;padding:16px 2px}
 [hidden]{display:none!important}
+dialog{width:420px;max-width:calc(100vw - 32px);border:1px solid #dce3ec;border-radius:12px;padding:24px;color:#233047;box-shadow:0 18px 70px #23304730}
+dialog::backdrop{background:#17263d66}
+dialog h2{font-size:18px;margin:0 0 16px}
+dialog p{font-size:13px;line-height:1.8;color:#68788d;overflow-wrap:anywhere}
+.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
 @media(max-width:600px){main{padding:24px 16px}h1{font-size:18px}header{gap:10px;margin-bottom:22px}.app-picker{padding:18px}th,td{padding:14px 16px}.size{width:95px}.url{font-size:11px}footer{font-size:10px}}

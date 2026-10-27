@@ -1,6 +1,6 @@
 "use strict";
 const $ = id => document.getElementById(id);
-let activeApp = "", appsSignature = "", busy = false, saving = false, version = 0, mode = "requests";
+let activeApp = "", appsSignature = "", busy = false, saving = false, version = 0, mode = "requests", deleteApp = "";
 
 async function api(path, body) {
   const response = await fetch(path, {
@@ -118,11 +118,18 @@ function changeView(next) {
 }
 $("requestsView").onclick = () => changeView("requests");
 $("domainsView").onclick = () => changeView("domains");
-$("deleteRecords").onclick = async () => {
+$("deleteRecords").onclick = () => {
   if (!activeApp || saving) return;
   const name = $("appSelect").selectedOptions[0]?.textContent || activeApp;
-  if (!confirm("删除当前应用「" + name + "」的全部监控记录？此操作不可恢复，不影响其他应用。新的请求仍会继续记录。")) return;
-  const app = activeApp;
+  deleteApp = activeApp;
+  $("deleteDescription").textContent = "将删除「" + name + "」的全部监控记录。";
+  $("deleteDialog").showModal();
+};
+$("cancelDelete").onclick = () => $("deleteDialog").close();
+$("confirmDelete").onclick = async () => {
+  if (!deleteApp || saving) return;
+  const app = deleteApp;
+  $("deleteDialog").close();
   ++version;
   saving = true;
   $("appSelect").disabled = true;
