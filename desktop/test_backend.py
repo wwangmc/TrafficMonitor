@@ -99,6 +99,82 @@ class BackendTest(unittest.TestCase):
         status,body,_=self.call('/api/requests?app=com.example.other')
         self.assertEqual(json.loads(body)['requests'],[{'url':'https://example.com/other','size':300}])
 
+    def test_domains_aggregate_all_saved_requests_and_unknowns(self):
+        self.seed()
+        self.collector.selected=['com.example.test']
+        with self.store.lock:
+            for i in range(205):
+                self.store.db.execute('INSERT INTO http SELECT ?,app,at,method,?,domain,status,duration,?,?,source,detail FROM http WHERE id=?',
+                                      ('known-'+str(i),'https://example.com/known',10,25,'request-1'))
+            self.store.db.execute('INSERT INTO http SELECT ?,app,at,method,url,?,status,duration,?,?,source,detail FROM http WHERE id=?',
+                                  ('larger','larger.test',10000,20000,'request-1'))
+            self.store.db.execute('INSERT INTO http SELECT ?,app,at,method,url,?,status,duration,up,down,source,detail FROM http WHERE id=?',
+                                  ('unknown','unknown.test','request-1'))
+            self.store.db.execute('INSERT INTO http SELECT ?,?,at,method,url,domain,status,duration,?,?,source,detail FROM http WHERE id=?',
+                                  ('other','com.example.other',100000,200000,'request-1'))
+            self.store.db.commit()
+        status,body,_=self.call('/api/requests?view=domains')
+        data=json.loads(body)
+        self.assertEqual(status,200)
+        self.assertEqual(data['requests'],[])
+        self.assertEqual(data['domains'],[
+            {'domain':'larger.test','size':30000,'requests':1,'unknown':0},
+            {'domain':'example.com','size':7175,'requests':206,'unknown':1},
+            {'domain':'unknown.test','size':None,'requests':1,'unknown':1}])
+        self.assertEqual(self.call('/api/requests?view=invalid')[0],400)
+
+    def test_delete_one_app_preserves_others_and_skips_old_reimport(self):
+        self.seed()
+        app,other='com.example.test','com.example.other'
+        self.collector.selected=[app]
+        stale=json.loads(self.store.db.execute('SELECT detail FROM http').fetchone()[0])
+        other_event=dict(stale,bundle_id=other,request_id='other-request')
+        sample={'kind':'socket_sample','event_id':'other-sample','connection_id':'other-connection',
+                'bundle_id':other,'time':time.time(),'fd':8,'protocol':'TCP','ip':'127.0.0.1','port':80,
+                'upload_bytes':10,'download_bytes':20,'state':'open'}
+        records=[(other+':http-events.jsonl','other-inode',100,
+                  ('\n'.join(map(json.dumps,[other_event,sample]))+'\n').encode())]
+        self.store.ingest(records)
+        generation=self.collector.generation
+        self.assertEqual(self.call('/api/clear-app',{'app':app,'confirm':'wrong'})[0],400)
+        self.assertEqual(self.call('/api/clear-app',{'app':'not-an-app','confirm':'CLEAR'})[0],400)
+        self.assertEqual(self.call('/api/clear-app',{'confirm':'CLEAR'})[0],400)
+        self.assertEqual(self.call('/api/clear-app',{'app':app,'confirm':'CLEAR'})[0],200)
+        self.assertEqual(self.store.state(app)['totals']['requests'],0)
+        self.assertEqual(self.store.state(other)['totals']['requests'],1)
+        self.assertEqual(self.store.state(app)['totals']['up'],0)
+        self.assertEqual(self.store.state(other)['totals']['up'],10)
+        self.assertIn(other+':http-events.jsonl',self.store.cursors())
+        self.assertNotIn(app+':http-events.jsonl',self.store.cursors())
+        self.assertEqual(self.collector.generation,generation)
+        self.assertIn(('clear_app',app),self.collector.commands)
+        self.store.ingest([(app+':http-events.jsonl','old-inode',100,(json.dumps(stale)+'\n').encode())])
+        self.assertEqual(self.store.state(app)['totals']['requests'],0)
+        fresh=dict(stale,request_id='after-delete',completed_at_unix=time.time()+1)
+        self.store.ingest([(app+':http-events.jsonl','new-inode',200,(json.dumps(fresh)+'\n').encode())])
+        self.assertEqual(self.store.state(app)['totals']['requests'],1)
+
+    def test_phone_cleanup_is_scoped_without_reconfiguring_other_apps(self):
+        collector=self.collector
+        calls=[]
+        class Bridge:
+            def apps(self):
+                return [{'id':'com.example.test'},{'id':'com.example.other'}]
+            def shell(self,command):
+                return str(time.time())
+            def configure(self,*args):
+                calls.append(('configure',args))
+            def clear_files(self,apps):
+                calls.append(('clear',[a['id'] for a in apps]))
+                collector.stop.set()
+            def read_files(self,*args):
+                return []
+        collector.bridge=Bridge()
+        collector.selected=['com.example.test']
+        collector.queue(('clear_app','com.example.test'))
+        collector.run()
+        self.assertEqual(calls,[('clear',['com.example.test'])])
+
     def test_history_and_parameter_binding(self):
         self.seed()
         self.assertEqual(self.call('/api/state?app=%27%20OR%201%3D1--')[0],200)

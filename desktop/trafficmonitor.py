@@ -137,6 +137,7 @@ class Store:
         CREATE TABLE IF NOT EXISTS http(id TEXT PRIMARY KEY,app TEXT,at REAL,method TEXT,url TEXT,domain TEXT,
           status INTEGER,duration REAL,up INTEGER,down INTEGER,source TEXT,detail TEXT);
         CREATE INDEX IF NOT EXISTS http_app_time ON http(app,at);
+        CREATE INDEX IF NOT EXISTS http_app_domain ON http(app,domain);
         CREATE TABLE IF NOT EXISTS samples(id TEXT PRIMARY KEY,connection TEXT,app TEXT,at REAL,up INTEGER,down INTEGER);
         CREATE INDEX IF NOT EXISTS samples_app_time ON samples(app,at);
         CREATE TABLE IF NOT EXISTS connections(id TEXT PRIMARY KEY,app TEXT,fd INTEGER,protocol TEXT,ip TEXT,port INTEGER,
@@ -164,8 +165,9 @@ class Store:
             return {r['path']: (r['inode'], r['offset']) for r in self.db.execute('SELECT * FROM cursors')}
 
     def ingest(self, records, offset=0):
-        cutoff = self.setting('cleared_at', 0)
         with self.lock, self.db:
+            cutoff = self.setting('cleared_at', 0)
+            app_cutoffs = self.setting('cleared_apps', {})
             for key, inode, position, raw in records:
                 for line in raw.splitlines():
                     try:
@@ -175,7 +177,7 @@ class Store:
                             continue
                         kind = e.get('kind')
                         at = float(e.get('completed_at_unix', e.get('time', 0))) + offset
-                        if at <= cutoff or at > time.time() + 60:
+                        if at <= max(cutoff, app_cutoffs.get(app, 0)) or at > time.time() + 60:
                             continue
                         if kind == 'http_request':
                             url = str(e.get('url', ''))[:4096]
@@ -212,12 +214,21 @@ class Store:
             self.db.execute('PRAGMA wal_checkpoint(PASSIVE)')
             self.db.execute('PRAGMA incremental_vacuum(256)')
 
-    def clear(self):
-        self.set('cleared_at', time.time())
-        with self.lock, self.db:
-            for table in ('http', 'samples', 'connections', 'health', 'cursors'):
-                self.db.execute('DELETE FROM ' + table)
+    def clear(self, app=None):
         with self.lock:
+            if app:
+                cutoffs = self.setting('cleared_apps', {})
+                cutoffs[app] = time.time()
+                self.set('cleared_apps', cutoffs)
+            else:
+                self.set('cleared_at', time.time())
+            with self.db:
+                for table in ('http', 'samples', 'connections', 'health'):
+                    self.db.execute('DELETE FROM ' + table + (' WHERE app=?' if app else ''), (app,) if app else ())
+                if app:
+                    self.db.execute('DELETE FROM cursors WHERE substr(path,1,?)=?', (len(app)+1,app+':'))
+                else:
+                    self.db.execute('DELETE FROM cursors')
             self.db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
             self.db.execute('VACUUM')
 
@@ -280,8 +291,12 @@ class Collector:
                 if commands:
                     affected = [a for a in self.apps if a['id'] in self.selected or a['id'] in self.store.setting('previous_selected', [])]
                     try:
-                        self.bridge.configure(affected, [] if self.paused else self.selected, self.generation)
+                        if 'config' in commands or 'clear' in commands:
+                            self.bridge.configure(affected, [] if self.paused else self.selected, self.generation)
                         if 'clear' in commands:self.bridge.clear_files(self.apps)
+                        for command in commands:
+                            if isinstance(command,tuple) and command[0]=='clear_app':
+                                self.bridge.clear_files([a for a in self.apps if a['id']==command[1]])
                     except Exception:
                         with self.lock:self.commands=commands+self.commands
                         raise
@@ -338,11 +353,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             app = query.get('app', [collector.selected[0] if collector.selected else ''])[0]
             if not app and collector.selected:
                 app = collector.selected[0]
+            view = query.get('view',['requests'])[0]
+            if view not in ('requests','domains'):
+                self.reply(400,{'error':'视图无效'});return
+            requests,domains = [],[]
             with store.lock:
-                requests = [dict(row) for row in store.db.execute(
-                    'SELECT url,size FROM (SELECT url,up+down AS size,at FROM http WHERE app=? '
-                    'ORDER BY at DESC LIMIT 200) ORDER BY size IS NULL,size DESC,at DESC', (app,))]
-            self.reply(200, {'app':app, 'requests':requests,
+                if view=='domains':
+                    domains = [dict(row) for row in store.db.execute(
+                        'SELECT domain,sum(up+down) AS size,count(*) AS requests,'
+                        'sum(up IS NULL OR down IS NULL) AS unknown FROM http WHERE app=? '
+                        'GROUP BY domain ORDER BY size IS NULL,size DESC,domain LIMIT 200', (app,))]
+                else:
+                    requests = [dict(row) for row in store.db.execute(
+                        'SELECT url,size FROM (SELECT url,up+down AS size,at FROM http WHERE app=? '
+                        'ORDER BY at DESC LIMIT 200) ORDER BY size IS NULL,size DESC,at DESC', (app,))]
+            self.reply(200, {'app':app, 'requests':requests, 'domains':domains, 'view':view,
                             'apps':[{'id':a['id'],'name':a['name']} for a in collector.apps],
                             'connected':bool(collector.updated) and not bool(collector.error), 'error':collector.error})
         elif parsed.path == '/api/state':
@@ -392,6 +417,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 store.set('selected',collector.selected);store.set('paused',collector.paused);store.set('retention_days',retention)
                 collector.queue('config')
                 self.reply(200,{'ok':True,'message':'配置已保存，USB 同步后新选应用需完全退出再打开'})
+            elif self.path == '/api/clear-app':
+                if body.get('confirm')!='CLEAR':raise ValueError('需要确认删除')
+                app=body.get('app')
+                allowed=set(collector.selected)|{a['id'] for a in collector.apps}
+                if not isinstance(app,str) or app not in allowed:raise ValueError('请选择有效的监控应用')
+                store.clear(app)
+                collector.queue(('clear_app',app))
+                self.reply(200,{'ok':True,'message':'已删除当前应用记录，新的请求将继续采集'})
             elif self.path == '/api/clear':
                 if body.get('confirm')!='CLEAR':raise ValueError('需要确认清理')
                 collector.generation+=1;store.set('generation',collector.generation)

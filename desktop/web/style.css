@@ -13,6 +13,12 @@ select:disabled{color:#7b8796}
 #hint{font-size:12px;color:#748195;margin:12px 0 0;line-height:1.7}
 #error{background:#fff1ed;border:1px solid #f0d5ca;color:#a75d45;padding:13px 16px;border-radius:8px;line-height:1.7}
 .requests{background:#fff;border:1px solid #e1e7ee;border-radius:12px;overflow:hidden}
+.list-toolbar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;gap:12px;border-bottom:1px solid #e7edf3}
+.views{display:flex;gap:3px;background:#f1f4f7;border-radius:7px;padding:3px}
+button{font:inherit;cursor:pointer;border:0;border-radius:5px;background:none;padding:7px 12px;color:#728095;font-size:12px}
+button[aria-pressed=true]{background:#fff;color:#207c68;box-shadow:0 1px 4px #23304712}
+button.delete{color:#b86758;border:1px solid #eddad4;background:#fff;padding:8px 12px}
+button:disabled{opacity:.5;cursor:default}
 table{width:100%;table-layout:fixed;border-collapse:collapse}
 th{text-align:left;padding:15px 24px;font-size:12px;color:#65758a;font-weight:600;background:#f9fbfd;border-bottom:1px solid #e7edf3}
 td{padding:15px 24px;border-bottom:1px solid #edf1f5;vertical-align:middle}

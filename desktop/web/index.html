@@ -16,10 +16,17 @@
     </section>
     <p id="error" role="alert" hidden></p>
     <section class="requests" aria-label="请求列表">
-      <table><thead><tr><th>请求 URL</th><th class="size">大小 ↓</th></tr></thead><tbody id="requestRows"></tbody></table>
+      <div class="list-toolbar">
+        <div class="views" role="group" aria-label="统计方式">
+          <button id="requestsView" aria-pressed="true">按请求</button>
+          <button id="domainsView" aria-pressed="false">按域名</button>
+        </div>
+        <button id="deleteRecords" class="delete" disabled>删除记录</button>
+      </div>
+      <table><thead><tr><th id="firstColumn">请求 URL</th><th id="sizeColumn" class="size">大小 ↓</th></tr></thead><tbody id="requestRows"></tbody></table>
       <p id="empty">正在加载请求…</p>
     </section>
-    <footer>最近 200 条请求，按大小从大到小排列，未知大小放在最后，自动更新。大小为请求与响应的应用数据合计；URL 参数值已脱敏。鼠标悬停可查看完整 URL。</footer>
+    <footer id="footnote">最近 200 条请求，按大小从大到小排列，未知大小放在最后，自动更新。大小为请求与响应的应用数据合计；URL 参数值已脱敏。鼠标悬停可查看完整 URL。</footer>
   </main>
   <script src="/app.js"></script>
 </body>
