@@ -14,6 +14,9 @@ static void PrintJSON(NSDictionary *object) {
     fflush(stdout);
 }
 
+static NSOperationQueue *gSharedBaselineQueue;
+static NSString *gSharedBaselineDispatchLabel;
+
 @interface TMProbeDelegate : NSObject <NSURLSessionDataDelegate>
 @property(nonatomic, strong) dispatch_semaphore_t finished;
 @property(nonatomic, strong) NSMutableData *received;
@@ -39,7 +42,16 @@ static NSURLSessionDataTask *RunCase(NSURLSession *session, dispatch_group_t gro
         NSInteger actual = [response isKindOfClass:NSHTTPURLResponse.class] ? ((NSHTTPURLResponse *)response).statusCode : 0;
         BOOL ok = failure ? (error != nil && (failure != 2 || error.code == NSURLErrorCancelled)) :
                             (!error && actual == status && [data isEqualToData:expected]);
-        BOOL callbackQueue = NSOperationQueue.currentQueue == session.delegateQueue;
+        BOOL callbackQueue;
+        if (session == NSURLSession.sharedSession) {
+            // sharedSession may use GCD with no current NSOperationQueue. Compare
+            // with its real unhooked baseline instead of an invented queue identity.
+            NSString *label = [NSString stringWithUTF8String:dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL)];
+            callbackQueue = NSOperationQueue.currentQueue == gSharedBaselineQueue &&
+                            [label isEqualToString:gSharedBaselineDispatchLabel];
+        } else {
+            callbackQueue = NSOperationQueue.currentQueue == session.delegateQueue;
+        }
         // All probe sessions use a serial delegate queue; protect cross-session callbacks too.
         @synchronized (results) {
             [results addObject:@{@"case": label, @"ok": @(ok && callbackQueue),
@@ -78,13 +90,27 @@ int main(int argc, char *argv[]) {
         BOOL redactionOK = [redacted containsString:@"example.com/a?"] &&
                            ![redacted containsString:@"alice"] && ![redacted containsString:@"tm_probe_"] &&
                            ![redacted containsString:@"abc"] && ![redacted containsString:@"#"];
-        if (!queueOK || !redactionOK || !TMHTTPInstallHooks()) {
+        if (!queueOK || !redactionOK) {
             PrintJSON(@{@"result": @"FAIL", @"queue_ok": @(queueOK), @"redaction_ok": @(redactionOK), @"health": health});
             return 1;
         }
         TMFixture fixture;
         if (!fixture.start()) { fprintf(stderr, "Fixture could not bind loopback\n"); return 1; }
         NSString *base = [NSString stringWithFormat:@"http://127.0.0.1:%u", fixture.port()];
+        dispatch_semaphore_t baselineFinished = dispatch_semaphore_create(0);
+        __block BOOL baselineOK = NO;
+        [[NSURLSession.sharedSession dataTaskWithURL:[NSURL URLWithString:[base stringByAppendingString:@"/get/baseline"]]
+                                 completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+            gSharedBaselineQueue = NSOperationQueue.currentQueue;
+            gSharedBaselineDispatchLabel = [NSString stringWithUTF8String:dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL)];
+            baselineOK = !error && [data isEqualToData:[@"get-ok" dataUsingEncoding:NSUTF8StringEncoding]];
+            dispatch_semaphore_signal(baselineFinished);
+        }] resume];
+        if (dispatch_semaphore_wait(baselineFinished, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) != 0 ||
+            !baselineOK || !TMHTTPInstallHooks()) {
+            PrintJSON(@{@"result": @"FAIL", @"reason": @"unhooked_baseline_or_installation_failed"});
+            return 1;
+        }
         NSOperationQueue *callbackQueue = [NSOperationQueue new];
         callbackQueue.maxConcurrentOperationCount = 1;
         callbackQueue.name = @"TrafficMonitor.probe.callbacks";
@@ -119,12 +145,12 @@ int main(int argc, char *argv[]) {
         BOOL timedOut = dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 25 * NSEC_PER_SEC)) != 0;
         if (timedOut) { PrintJSON(@{@"result": @"FAIL", @"reason": @"callback_timeout"}); return 1; }
 
-        // Nil-completion tasks must retain their original delegate behavior and stay uncaptured.
+        // The supported delegate API must retain its original behavior and stay uncaptured.
         TMProbeDelegate *delegate = [TMProbeDelegate new];
         delegate.finished = dispatch_semaphore_create(0);
         delegate.received = [NSMutableData data];
         NSURLSession *delegated = [NSURLSession sessionWithConfiguration:config delegate:delegate delegateQueue:callbackQueue];
-        [[delegated dataTaskWithRequest:request(@"/get/delegate") completionHandler:nil] resume];
+        [[delegated dataTaskWithRequest:request(@"/get/delegate")] resume];
         BOOL delegateOK = dispatch_semaphore_wait(delegate.finished, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) == 0 &&
                           delegate.calls == 1 && !delegate.error && [delegate.received isEqualToData:getBody];
         [session finishTasksAndInvalidate];
@@ -161,7 +187,8 @@ int main(int argc, char *argv[]) {
         PrintJSON(@{@"result": ok ? @"PASS" : @"FAIL", @"callbacks": results, @"http_events": @(http.count),
                     @"unique_requests": @(identifiers.count), @"fields_ok": @(fieldsOK), @"body_bytes_ok": @(bytesOK),
                     @"redirect_ok": @(redirectOK), @"cancellation_ok": @(cancellationOK), @"redaction_ok": @(secretsOK),
-                    @"permissions_ok": @(permissionsOK), @"nil_completion_delegate_ok": @(delegateOK),
+                    @"permissions_ok": @(permissionsOK), @"delegate_path_unchanged": @(delegateOK),
+                    @"shared_baseline_dispatch_label": gSharedBaselineDispatchLabel ?: @"<none>",
                     @"session_class": NSStringFromClass(object_getClass(session)),
                     @"default_class": NSStringFromClass(object_getClass(defaultSession)),
                     @"shared_class": NSStringFromClass(object_getClass(NSURLSession.sharedSession)),

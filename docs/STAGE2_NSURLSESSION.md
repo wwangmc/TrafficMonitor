@@ -36,7 +36,7 @@ utility 串行 worker 每 250ms 最多消费 64 条，写 App 自身 `tmp/Traffi
 /var/jb/usr/libexec/trafficmonitor/tm-probe --self-test
 ```
 
-显式运行时才创建 127.0.0.1 随机端口的合成 HTTP fixture，结束关闭。检查 GET/POST、404、重定向、断连、取消、32 个并发、shared/default/ephemeral session、callback queue、nil completion delegate、去重、body 字节、URL/headers/body 不泄露、目录权限和有界队列。预期 40 条 HTTP 事件与 40 个唯一请求，JSON `result=PASS`、退出码 0。queue 压力事件单独标成 queue_diagnostic。
+显式运行时才创建 127.0.0.1 随机端口的合成 HTTP fixture，结束关闭。检查 GET/POST、404、重定向、断连、取消、32 个并发、shared/default/ephemeral session、callback queue、delegate 原路径不变、去重、body 字节、URL/headers/body 不泄露、目录权限和有界队列。sharedSession 的回调执行环境与安装拦截前的真实 baseline 对比，显式配置的 session 则严格检查指定 NSOperationQueue。预期 40 条 HTTP 事件与 40 个唯一请求，JSON `result=PASS`、退出码 0。queue 压力事件单独标成 queue_diagnostic。
 
 CI 先编译/运行 macOS native probe，再交叉编译 iOS 包与检查内容；macOS 通过不能替代真机或游戏网络路径验证。
 
