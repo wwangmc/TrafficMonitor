@@ -1,6 +1,6 @@
 # TrafficMonitor
 
-Theos + Objective-C++/Logos 的 iOS 越狱网络监控工程。**目前交付第一阶段：指定进程注入基线，已通过 GitHub Actions Rootless 编译与包内容检查。HTTP、Socket、SQLite 和 WebUI 尚未实现；真机安装和注入未验证。**
+Theos + Objective-C++/Logos 的 iOS 越狱网络监控工程。**目前交付第一阶段：指定进程注入基线，已通过 GitHub Actions Rootless 编译、包内容检查，以及 iPhone X / iOS 16.1.1 上三次冷启动的真实注入验证。HTTP、Socket、SQLite 和 WebUI 尚未实现。**
 
 私有仓库：[wwangmc/TrafficMonitor](https://github.com/wwangmc/TrafficMonitor)。[成功构建 #1](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548) · [Rootless 产物](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548/artifacts/12707061218) · [验证记录](docs/BUILD_VERIFICATION.md)。
 
@@ -74,6 +74,7 @@ log stream --level info --predicate 'subsystem == "com.example.trafficmonitor"'
 
 - [实施计划](docs/IMPLEMENTATION_PLAN.md)：NSURLSession → Socket → SQLite → WebUI → CI 集成；含异步采集、沙盒 IPC 与隐私约束。
 - [阶段进展](docs/PROGRESS.md)：实际检查与尚未验证的内容。
+- [真机验收记录](docs/DEVICE_RUN_2026-10-27.md)：安装文件一致性、实际加载日志和设备测试边界。
 - [兼容性矩阵](docs/COMPATIBILITY.md)：Network.framework、CFNetwork、libcurl、Unity/Unreal 的待测路径。
 
 HTTP 请求/应用数据与 Socket 字节将分开存储。Socket 用户态调用返回字节不能标为真实网络层流量，也不能与 HTTP 字节相加。后续 Web/collector 只监听 `127.0.0.1`，要求认证、URL 脱敏和记录清理；这些功能尚未实现。

@@ -1,6 +1,6 @@
 # 第一阶段设备验收
 
-Rootless 编译及包内容检查已执行，证据见 `BUILD_VERIFICATION.md`。以下真机步骤尚未执行，没有安装或注入证据。
+Rootless 编译及包内容检查已执行，证据见 `BUILD_VERIFICATION.md`。iPhone X / iOS 16.1.1 的安装与注入证据见 `DEVICE_RUN_2026-10-27.md`；下文保留可复用的验收步骤，未执行的项目明确列在记录中。
 
 ## 构建与包内容
 
@@ -35,8 +35,8 @@ Rootless 预期架构 `iphoneos-arm64`，dylib/Filter 位于 `./var/jb/Library/M
 
 | 项目 | 结果 |
 | --- | --- |
-| 设备 / iOS / 越狱 / 注入器 | 未执行 |
+| 设备 / iOS / 越狱 / 注入器 | iPhone X / iOS 16.1.1 / Rootless（越狱版本未查询）/ ElleKit 1.2 |
 | 构建日志 / CI run URL | [Run #1 成功](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548) |
 | 包文件 / SHA-256 / 架构 / 路径 | Rootless 包检查通过，详见 BUILD_VERIFICATION.md |
-| 目标日志 / PID / 非目标负例 | 未执行 |
-| 稳定性 / 卸载 | 未执行 |
+| 目标日志 / PID / 非目标负例 | PID 31600、31669、31709 各出现一次加载日志；设置 PID 31728 未观察到该日志，详见真机记录 |
+| 稳定性 / 卸载 | 301.5 秒、11 次存活采样通过；末次目标 PID 已运行 05:43，仍为前台游戏；未卸载用户已安装的包 |

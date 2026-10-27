@@ -25,7 +25,7 @@
 
 ## 限制
 
-这次只验证第一阶段 Rootless 构建。未执行 iOS 设备安装、目标 App 注入、稳定性或 Rootful 编译；HTTP、Socket、SQLite 和 WebUI 未实现。
+这次 CI 只验证第一阶段 Rootless 构建。后续已在 iPhone X / iOS 16.1.1 验证安装文件与目标 App 注入，见 `DEVICE_RUN_2026-10-27.md`。Rootful 编译、HTTP、Socket、SQLite 和 WebUI 未验证/未实现。
 
 日志存在非致命警告：Theos 链接参数 `-multiply_defined` 已过时；Actions v4 的 Node 20 元数据被 runner 强制转为 Node 24。它们没有阻止此次构建，后续升级工具链时需再验证。
 

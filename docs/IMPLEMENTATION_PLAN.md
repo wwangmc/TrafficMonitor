@@ -6,7 +6,7 @@
 
 | 阶段 | 实际交付 | 验收条件 | 当前状态 |
 | --- | --- | --- | --- |
-| 1 最小 Tweak | Makefile、control、Bundle Filter、Objective-C++/Logos 加载入口、目标配置脚本、构建骨架 | 两种 scheme 可独立构建；Rootless deb 可安装；指定 App 冷启动出现一次加载日志；其他 App 不注入 | 源码、静态检查、Rootless CI/包检查通过；Rootful 编译与真机验收待执行 |
+| 1 最小 Tweak | Makefile、control、Bundle Filter、Objective-C++/Logos 加载入口、目标配置脚本、构建骨架 | 两种 scheme 可独立构建；Rootless deb 可安装；指定 App 冷启动出现一次加载日志；其他 App 不注入 | 源码、静态检查、Rootless CI/包检查及三次真机冷启动注入通过；Rootful 编译待执行 |
 | 2 NSURLSession | 先 dataTask completion-handler 路径，再 delegate、upload、download；请求事件模型与最小验证客户端 | 自建服务验证 GET/POST、错误、取消、重定向、并发；逐项标明支持范围 | 待实现 |
 | 3 Socket | connect/send/recv/sendto/recvfrom/sendmsg/recvmsg；连接与字节模型 | TCP/UDP、IPv4/IPv6、部分收发、失败、非阻塞、fd 复用等有实测记录 | 待实现 |
 | 4 SQLite | 独立 collector、受限 IPC、有界采集队列、异步批量写入、保留与删除策略 | 真机验证 App 沙盒能访问 collector；积压有界；网络线程不等待磁盘/IPC；重启恢复、清理和丢弃计数可验证 | 待实现 |

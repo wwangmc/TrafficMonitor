@@ -117,7 +117,7 @@ def main():
     if failures:
         return 1
     print("PASS: static metadata, target consistency, encoding and build settings")
-    print("NOT VERIFIED: iOS compilation, .deb contents, installation or injection")
+    print("NOT CHECKED BY THIS SCRIPT: iOS compilation, .deb contents, installation or injection")
     return 0
 
 
