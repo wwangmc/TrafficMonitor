@@ -1,4 +1,4 @@
-# Stage 1 scaffold: no successful CI build has been recorded yet.
+# Rootless build and package inspection; run evidence is in docs/PROGRESS.md.
 name: Build Theos packages
 
 on:

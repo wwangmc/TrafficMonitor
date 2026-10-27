@@ -25,3 +25,15 @@
 阶段 1 状态：源码基线与静态检查完成；构建/设备验收待执行。当前没有编译产物。
 
 下一步：有工具链时构建本基线并按 `DEVICE_VALIDATION.md` 验收，随后实现 NSURLSession dataTask completion 路径。阶段 2–6 业务源码尚未开始。
+
+## 2026-10-27 GitHub Actions 编译
+
+用户明确授权新建私有仓库、上传源码并运行编译。已创建 [wwangmc/TrafficMonitor](https://github.com/wwangmc/TrafficMonitor)，提交第一阶段源码并由 push 自动触发 workflow。
+
+- [Run #1](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548) 成功完成，源码提交 `be1b37543cba76dd543f728431996aabcdc87e9e`。
+- 新增 `scripts/inspect_deb.py`：实际检查 deb 身份、包架构、Rootless 文件路径、Filter、Mach-O 切片与依赖，并生成报告；CI 步骤通过。
+- Rootless deb 已下载到本地，ZIP SHA-256 与 GitHub Artifact digest 一致；本地再次检查包内容通过。
+- 编译产物：`com.example.trafficmonitor_0.1.0_iphoneos-arm64.deb`，arm64/arm64e、iOS 15.0+。详细哈希、工具链与限制见 `BUILD_VERIFICATION.md`。
+- Rootful 构建、真机安装/注入和阶段 2–6 的完整业务能力仍待验证。第一阶段的“尚未编译”记录是首次初始化时状态，以本节为当前状态。
+
+当前状态：第一阶段源码、静态检查、Rootless CI 编译和包内容检查完成；真机验收待执行。

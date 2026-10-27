@@ -1,6 +1,8 @@
 # TrafficMonitor
 
-Theos + Objective-C++/Logos 的 iOS 越狱网络监控工程。**目前交付第一阶段：指定进程注入基线。HTTP、Socket、SQLite 和 WebUI 尚未实现。未执行 iOS 编译、CI 或真机安装，当前没有已验证的 `.deb`。**
+Theos + Objective-C++/Logos 的 iOS 越狱网络监控工程。**目前交付第一阶段：指定进程注入基线，已通过 GitHub Actions Rootless 编译与包内容检查。HTTP、Socket、SQLite 和 WebUI 尚未实现；真机安装和注入未验证。**
+
+私有仓库：[wwangmc/TrafficMonitor](https://github.com/wwangmc/TrafficMonitor)。[成功构建 #1](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548) · [Rootless 产物](https://github.com/wwangmc/TrafficMonitor/actions/runs/40442530548/artifacts/12707061218) · [验证记录](docs/BUILD_VERIFICATION.md)。
 
 目标为 `com.korea.mrtgd2.ios`。加载入口只校验 Bundle ID、系统版本并输出一次日志：`stage=1 event=loaded ... capture=disabled`。不会主动发请求、监听端口或记录业务数据；不猜测目标可执行文件名，不自动杀进程。
 
@@ -48,13 +50,13 @@ gmake -j2 TYPE=0 FINALPACKAGE=1 package
 
 GNU make 若命名为 `make` 可替换 `gmake`。更换 SDK 可传 `TM_SDK=<已安装版本>`，需要重新验证。切换 TYPE、SDK、架构时先 clean。
 
-## GitHub Actions 骨架
+## GitHub Actions 构建
 
-`.github/workflows/build.yml` 已生成但**未运行；阶段 6 的 CI 验收尚未完成**。默认只构建 Rootless，使用 `macos-15`、Xcode 16.4、RootHide Theos 和 iPhoneOS16.5.sdk。Theos/SDK 跟踪远程分支并打印 SHA，暂非完全可重现构建。
+`.github/workflows/build.yml` **已运行成功并生成 Rootless deb**。默认只构建 Rootless，使用 `macos-15`、Xcode 16.4、RootHide Theos 和 iPhoneOS16.5.sdk，自动检查 deb 路径、包架构、dylib 切片和 Filter。Theos/SDK 跟踪远程分支并打印 SHA，暂非完全可重现构建。阶段 6 的完整监控链路验收仍待后续实现。
 
 1. 将本目录内容作为 GitHub 仓库根目录，包含隐藏的 `.github/`。若位于其他仓库子目录，应先调整 workflow 位置及工作目录。
 2. 推送 main/master，或从 **Actions → Build Theos packages → Run workflow** 手动运行。
-3. 只有成功 run 的 **Artifacts → TrafficMonitor-rootless** 才有 deb；日志为 `build-log-rootless`。本轮未创建远程仓库或触发 CI。
+3. 成功 run 的 **Artifacts → TrafficMonitor-rootless** 包含 `packages/*.deb` 与 `package-inspection.json`；日志为 `build-log-rootless`。Artifacts 保留 14 天，私有仓库下载需要登录有权限的 GitHub 账号。
 
 ## 安装与使用
 
