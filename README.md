@@ -25,11 +25,15 @@
 
 ## 构建与安装
 
-[GitHub Actions](https://github.com/wwangmc/TrafficMonitor/actions/workflows/build.yml) 自动执行静态检查、SQLite/API 集成测试、原生 HTTP/Socket 诊断、Rootless 编译、包内路径及 Mach-O 检查，上传 `TrafficMonitor-rootless` 与 `TrafficMonitor-Desktop`。
+[GitHub Actions](https://github.com/wwangmc/TrafficMonitor/actions/workflows/build.yml) 自动执行静态检查、SQLite/API 集成测试、原生 HTTP/Socket 诊断，独立编译 Rootful、Rootless、RootHide，检查包内路径与 Mach-O，上传三个环境的 deb 与桌面版。0.4.0 三种包已在 [run 40459242763](https://github.com/wwangmc/TrafficMonitor/actions/runs/40459242763) 全部编译成功。
 
 Rootless：`make TYPE=1 clean package`，iOS 15+、arm64/arm64e，安装到 `/var/jb`，优先适配 Dopamine/ElleKit。部署下限不代表所有设备与所有游戏均已测试。
 
-Rootful 独立方案：`make TYPE=0 ARCHS=arm64 clean package`，iOS 14+、传统安装前缀。**Dopamine 不是 iOS 14 越狱工具**。Rootful 目前预留并静态检查，未做 iOS 14 真机构建/运行验收。两个模式分别 clean，避免混用产物。
+Rootful 独立方案：`make TYPE=0 ARCHS=arm64 clean package`，iOS 14+、传统安装前缀。**Dopamine 不是 iOS 14 越狱工具**。Rootful 已完成 CI 编译和安装包检查，未做 iOS 14 真机运行验收。
+
+RootHide：`make TYPE=2 clean package`，iOS 15+、arm64/arm64e、`iphoneos-arm64e` 包架构。已完成 CI 编译和包检查，未做 RootHide 真机运行验收；目标应用还需在 Bootstrap App List 启用注入。三个模式分别 clean，避免混用产物。
+
+GoScrcpy 定制版已通过原生 Go 采集器集成此功能：右键 iOS 设备选择「网络监控」，自动检测并通过 MKS 安装缺失插件，三种 deb 均嵌入 EXE。它使用独立的按手机 SQLite 历史，删除提供撤销且不清空手机日志；不依赖 Python。原独立 Python 版数据库保持原样，勿同时运行两个采集器修改目标配置。
 
 本机 Windows 无 Theos/Xcode，不声称本地完成 iOS 编译。实际包由 GitHub macOS runner 构建。Rootless 安装示例：`dpkg -i com.example.trafficmonitor_<version>_iphoneos-arm64.deb`；不需要自动重启 SpringBoard，只需冷启动监控应用。
 

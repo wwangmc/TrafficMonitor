@@ -1,6 +1,6 @@
 # 兼容性与实测边界
 
-0.3.1 支持 NSURLSession 已验证路径及 BSD Socket 导入符号采集。覆盖率未知，不提供全游戏、全 API 或真实网卡流量承诺。
+0.4.0 沿用 0.3.1 的 NSURLSession 与 BSD Socket 导入符号采集，增加独立 Rootful/Rootless/RootHide 编译和环境标识。覆盖率未知，不提供全游戏、全 API 或真实网卡流量承诺。
 
 | 路径 | 当前实现 / 实测 | 限制 |
 | --- | --- | --- |
@@ -31,4 +31,4 @@
 - [fishhook](https://github.com/facebook/fishhook)：动态导入重绑定机制，和内核抓包有不同覆盖范围。
 - [Theos Rootless](https://theos.dev/docs/rootless)、[ElleKit](https://github.com/tealbathingsuit/ellekit)：安装前缀与注入环境依据，不代表任意游戏的兼容性保证。
 
-没有 TLS 解密、证书绕过、反作弊绕过、系统全局抓包或真实接口流量统计。Rootful iOS 14 为独立预留构建，尚无真机验收；Dopamine 目标为 iOS 15+ Rootless。
+没有 TLS 解密、证书绕过、反作弊绕过、系统全局抓包或真实接口流量统计。0.4.0 的 Rootful iOS 14、Rootless、RootHide 三种包已通过 GitHub Actions 编译与包检查，Rootful/RootHide 尚无真机运行验收；Dopamine 目标为 iOS 15+ Rootless。RootHide 还需在 Bootstrap 中开启目标应用注入，不能把编译成功等同于全场景可运行。

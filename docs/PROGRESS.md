@@ -76,3 +76,12 @@ HTTP、Socket、SQLite、WebUI、GitHub Actions 均已有实际源码及可用�
 - 原始真实事件与截图只存本地 packages；仅合成测试结果和匿名计数写进项目记录。
 
 当前状态：第二阶段 dataTask completion 最小版完成并验证；其他 NSURLSession 路径仍待扩展。详细证据、哈希与限制见 `STAGE2_VERIFICATION.md`。
+
+## 2026-10-27 0.4.0 多环境打包与 GoScrcpy 集成
+
+- 采集实现沿用已验证的 0.3.1；增加 TYPE=0 Rootful / TYPE=1 Rootless / TYPE=2 RootHide 独立构建，保留 iOS 14 与 iOS 15 的环境区别。
+- [Actions run 40459242763](https://github.com/wwangmc/TrafficMonitor/actions/runs/40459242763) 的三个 matrix 作业全部成功，提交 75625900b2a20e595ada42d00efd34828433822f。各作业执行原生 probe、桌面测试、交叉编译与包结构/Mach-O 检查。
+- 三种真实 deb 下载并核验 ZIP digest 后复制至 GoScrcpy 定制版 `internal/trafficmonitor/packages/`，通过 manifest SHA-256 校验并嵌入 EXE。包哈希见 `validation/0.4.0/packages.json`。
+- GoScrcpy 原生 Go/SQLite 采集器通过指定手机的 MKS USB 通道工作，iOS 设备右键打开内置独立窗口；缺少插件时按 dpkg 架构自动安装，结果不确定时停止重试。
+- 界面保留选择应用、请求 URL 与大小、域名汇总、降序与可撤销删除；不截断手机日志，也不改动原独立 Python 版历史库。域名统计不混入 Socket 字节。
+- Go 全量测试、vet、41 项前端测试、Wails 便携版构建通过。iPhone X / iOS 16.1.1 / Rootless 已装 0.3.1：读取应用列表/Filter/日志、原生窗口真实请求与域名汇总、删除取消均已验证。自动安装用三环境模拟协议测试；未为测试卸载已装插件。Rootful 与 RootHide 只完成 CI 编译和包检查，尚无对应真机运行验收。

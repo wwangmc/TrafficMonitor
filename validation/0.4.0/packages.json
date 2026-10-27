@@ -1,0 +1,28 @@
+{
+  "commit": "75625900b2a20e595ada42d00efd34828433822f",
+  "ci": "success",
+  "runtime_04": "not tested; connected rootless device retains compatible 0.3.1",
+  "packages": {
+    "rootful": {
+      "file": "com.example.trafficmonitor_0.4.0_iphoneos-arm.deb",
+      "sha256": "b5745a7657e8b708ef1f601259f76558f49b587fa7a7d5b4104a476bf3d5a19d",
+      "version": "0.4.0",
+      "architecture": "iphoneos-arm",
+      "build": "https://github.com/wwangmc/TrafficMonitor/actions/runs/40459242763"
+    },
+    "rootless": {
+      "file": "com.example.trafficmonitor_0.4.0_iphoneos-arm64.deb",
+      "sha256": "9285576a13ab9ca7160d49ffe09d4953d007715cfb826e8293ae69a905aff26b",
+      "version": "0.4.0",
+      "architecture": "iphoneos-arm64",
+      "build": "https://github.com/wwangmc/TrafficMonitor/actions/runs/40459242763"
+    },
+    "roothide": {
+      "file": "com.example.trafficmonitor_0.4.0_iphoneos-arm64e.deb",
+      "sha256": "8087c8e767abf22b7dfec945b0213c030626f201d79680ff097e151c389b5006",
+      "version": "0.4.0",
+      "architecture": "iphoneos-arm64e",
+      "build": "https://github.com/wwangmc/TrafficMonitor/actions/runs/40459242763"
+    }
+  }
+}
