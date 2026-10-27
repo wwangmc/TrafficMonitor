@@ -2,7 +2,7 @@
 
 ## 路径
 
-精确 Bundle Filter → 进程内 Tweak → HTTP 元数据队列 / Socket C 环形队列 → utility 串行写入两个 JSONL 流 → USB 增量读取 → 电脑 SQLite WAL → 127.0.0.1 认证 API → 本地 WebUI。
+精确 Bundle Filter → 进程内 Tweak → HTTP 元数据队列 / Socket C 环形队列 → utility 串行写入两个 JSONL 流 → USB 增量读取 → 电脑 SQLite WAL → 127.0.0.1 本地 API → 本地 WebUI。
 
 选择 USB 桥接是为了在目标 App 沙盒内只写自己的临时目录，不要求任意应用访问全局 SQLite 或跨应用监听端口。当前桥接依赖这台设备已有的 MKS/roothelp；未实现独立安装的 iOS collector daemon 或手机端网页服务。用户直接操作的是电脑浏览器观测台。
 
@@ -38,4 +38,4 @@ Socket 字节是调用成功处理的用户缓冲区长度，TLS 路径可能表
 
 ## 安全边界
 
-本地接口随机 Bearer、精确 Host/Origin、无 CORS、CSP、纯文本 DOM、参数化 SQLite，不提供网页任意 Shell API。USB 管理器只执行固定功能与经白名单验证的 Bundle/容器路径，选择上限8。共享电脑账户及既有 MKS/roothelp 通道属于受信任边界。不会安装 TLS 证书或关闭系统安全策略。
+按用户要求移除访问令牌和登录；本地接口保留精确 Host/Origin、无 CORS、CSP、纯文本 DOM、参数化 SQLite，不提供网页任意 Shell API。USB 管理器只执行固定功能与经白名单验证的 Bundle/容器路径，选择上限8。共享电脑账户及既有 MKS/roothelp 通道属于受信任边界。不会安装 TLS 证书或关闭系统安全策略。

@@ -16,15 +16,15 @@ class BackendTest(unittest.TestCase):
         self.collector=Collector(self.store)
         self.collector.apps=[{'id':'com.example.test','name':'Test','container':'/not-used'}]
         self.server=ThreadingHTTPServer(('127.0.0.1',0),Handler)
-        self.server.token='test-only-token';self.server.collector=self.collector
+        self.server.collector=self.collector
         threading.Thread(target=self.server.serve_forever,daemon=True).start()
 
     def tearDown(self):
         self.server.shutdown();self.server.server_close();self.store.db.close();self.temp.cleanup()
 
-    def call(self,path,body=None,token=True,headers=None):
+    def call(self,path,body=None,headers=None):
         connection=http.client.HTTPConnection('127.0.0.1',self.server.server_port,timeout=3)
-        request_headers={'Authorization':'Bearer test-only-token'} if token else {}
+        request_headers={}
         request_headers.update(headers or {})
         if body is not None:request_headers['Content-Type']='application/json'
         connection.request('POST' if body is not None else 'GET',path,json.dumps(body) if body is not None else None,request_headers)
@@ -51,14 +51,14 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(state['ips'][0]['down'],512)
         self.assertEqual(len(state['graph']),1)
 
-    def test_auth_host_origin_and_static_policy(self):
-        self.assertEqual(self.call('/api/state',token=False)[0],401)
+    def test_local_access_host_origin_and_static_policy(self):
+        self.assertEqual(self.call('/api/state')[0],200)
+        self.assertEqual(self.call('/api/export')[0],200)
         self.assertEqual(self.call('/api/state',headers={'Host':'evil.example'})[0],403)
         self.assertEqual(self.call('/api/config',{'selected':[]},headers={'Origin':'https://evil.example'})[0],403)
-        status,raw,headers=self.call('/',token=False)
+        status,raw,headers=self.call('/')
         self.assertEqual(status,200)
         self.assertIn('frame-ancestors',headers['Content-Security-Policy'])
-        self.assertNotIn(b'test-only-token',raw)
 
     def test_config_validation_and_clear(self):
         before=self.collector.selected[:]

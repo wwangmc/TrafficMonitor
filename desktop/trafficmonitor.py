@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TrafficMonitor local USB collector, SQLite store and authenticated dashboard."""
+"""TrafficMonitor local USB collector, SQLite store and dashboard."""
 import argparse
 import base64
 import collections
@@ -11,7 +11,6 @@ import os
 from pathlib import Path
 import plistlib
 import re
-import secrets
 import shlex
 import sqlite3
 import threading
@@ -326,9 +325,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.reply(403, {'error':'Origin 不受信任'}); return False
         return True
 
-    def authorized(self):
-        return secrets.compare_digest(self.headers.get('Authorization','').encode('utf-8'), ('Bearer ' + self.server.token).encode())
-
     def do_GET(self):
         if not self.allowed(): return
         parsed = urllib.parse.urlsplit(self.path)
@@ -336,7 +332,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             name = {'/':'index.html','/app.js':'app.js','/style.css':'style.css'}[parsed.path]
             content = {'index.html':'text/html; charset=utf-8','app.js':'text/javascript; charset=utf-8','style.css':'text/css; charset=utf-8'}[name]
             self.reply(200, (ROOT / 'web' / name).read_bytes(), content); return
-        if not self.authorized(): self.reply(401, {'error':'请输入本次启动的访问令牌'}); return
         collector, store = self.server.collector, self.server.collector.store
         query = urllib.parse.parse_qs(parsed.query)
         if parsed.path == '/api/state':
@@ -366,7 +361,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         if not self.allowed(): return
-        if not self.authorized(): self.reply(401,{'error':'未认证'});return
         try:
             length=int(self.headers.get('Content-Length','0'))
             if not 0<length<=8192: raise ValueError()
@@ -411,8 +405,8 @@ def main():
     if args.offline:collector.error='离线历史模式'
     else:threading.Thread(target=collector.run,daemon=True).start()
     server=http.server.ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
-    server.daemon_threads=True;server.collector=collector;server.token=secrets.token_urlsafe(32)
-    print(json.dumps({'url':f'http://127.0.0.1:{server.server_port}/#token={server.token}', 'port':server.server_port}),flush=True)
+    server.daemon_threads=True;server.collector=collector
+    print(json.dumps({'url':f'http://127.0.0.1:{server.server_port}/', 'port':server.server_port}),flush=True)
     try:server.serve_forever()
     except KeyboardInterrupt:pass
     finally:collector.stop.set();server.server_close()

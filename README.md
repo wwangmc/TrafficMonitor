@@ -6,10 +6,10 @@
 
 1. 手机安装 Actions 生成的 Rootless `.deb`，完全结束并重新打开目标应用。
 2. 电脑连接并信任 iPhone；安装 Python 3.9+、Apple USB 驱动。当前桌面采集器使用这台手机已安装的 **MKS 管理插件（8081 / roothelp）**，通过 USB 访问；无需手工创建端口转发。新设备若没有 MKS，Tweak 仍能生成诊断文件，但桌面实时同步和应用配置不可用。
-3. Windows 双击项目根目录 **start.cmd**，首次自动安装 `tidevice==0.12.10`，打开带本次访问凭据的浏览器。保持启动窗口运行，退出用 Ctrl+C。
+3. Windows 双击项目根目录 **start.cmd**，首次自动安装 `tidevice==0.12.10`，直接打开本地观测台。保持启动窗口运行，退出用 Ctrl+C。
 4. 点击「监控应用」选择目标，保存后完全退出并重新打开新选应用。「暂停/恢复」通过 USB 同步，约 1 秒后影响运行中的采集器。
 
-服务只绑定 **127.0.0.1:27681**。启动器自动传递随机访问令牌；直接打开地址的新浏览器会要求令牌。启动输出包含凭据，请勿分享。USB 断开仍可查看电脑已经保存的历史。
+服务只绑定 **127.0.0.1:27681**。直接打开 http://127.0.0.1:27681/ 即可使用，无需访问令牌或登录。USB 断开仍可查看电脑已经保存的历史。
 
 手动运行：`python desktop/trafficmonitor.py`。多设备用 `--udid`，仅查看历史用 `--offline`，换端口用 `--port`。数据默认保存在 `desktop/data/trafficmonitor.sqlite3`，不随源码上传。
 
@@ -36,6 +36,6 @@ Rootful 独立方案：`make TYPE=0 ARCHS=arm64 clean package`，iOS 14+、传�
 
 `Tweak.xm`、`Sources/` 为采集代码；`probe/` 为独立诊断工具；`desktop/` 为 SQLite/USB 服务与 WebUI；`scripts/` 为静态/安装包检查；`.github/workflows/build.yml` 为 CI。fishhook 授权和修改说明见 `THIRD_PARTY_LICENSES/`。
 
-URL 的 query 值全部脱敏，移除 user/password/fragment，不采集 header、cookie、请求或响应正文。URL path 仍可能包含业务标识。手机日志每类最多 2×1 MiB，电脑每类最多 100,000 条并按保留期清理。WebUI 使用随机 Bearer 凭据、Host/Origin 校验、CSP、参数化 SQL 与纯文本 DOM。
+URL 的 query 值全部脱敏，移除 user/password/fragment，不采集 header、cookie、请求或响应正文。URL path 仍可能包含业务标识。手机日志每类最多 2×1 MiB，电脑每类最多 100,000 条并按保留期清理。WebUI 无需访问令牌，保留 Host/Origin 校验、CSP、参数化 SQL 与纯文本 DOM。
 
 尚未宣称覆盖 CFNetwork HTTPStream、Network.framework/QUIC、所有 libcurl/Unity/Unreal 后端、后台系统进程或直接 syscall。已测结果与实际问题修复记录见 [进展](docs/PROGRESS.md) 及 [交付验收](docs/RELEASE_VERIFICATION.md)。

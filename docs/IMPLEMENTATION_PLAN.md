@@ -1,3 +1,5 @@
+> 后续调整：按用户要求已移除本地 WebUI 访问令牌与登录，保留127.0.0.1和Host/Origin限制。下文认证设计仅为历史方案。
+
 > 当前交付：0.3.1 已完成 HTTP、Socket、电脑 SQLite、USB WebUI 和 GitHub Actions。以下保留最初实施设计；最终桥接采用已有 MKS/roothelp，SQLite 与 Web 服务运行在电脑。兼容性与验收以 COMPATIBILITY.md / RELEASE_VERIFICATION.md 为准。
 
 # TrafficMonitor 实施计划
