@@ -82,6 +82,8 @@ void TMFixture::serve(int fd) {
     int status = path == "/missing" ? 404 : (path == "/redirect" ? 302 : 200);
     std::string body = path == "/post" ? request.substr(headerEnd + 4, bodySize) :
                        (path == "/final" ? "final-ok" : (path == "/missing" ? "not-found" : "get-ok"));
+    if (target == "http://ip-api.invalid/json" && request.compare(0,4,"GET ")==0)
+        body = R"({"status":"success","query":"203.0.113.42","country":"Proxy fixture"})";
     std::string headers = "HTTP/1.1 " + std::to_string(status) + " Test\r\nConnection: close\r\nContent-Type: text/plain\r\n";
     if (status == 302) headers += "Location: /final?token=tm_probe_redirect_secret\r\n";
     headers += "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n";

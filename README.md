@@ -37,6 +37,12 @@ GoScrcpy 定制版已通过原生 Go 采集器集成此功能：右键 iOS 设�
 
 本机 Windows 无 Theos/Xcode，不声称本地完成 iOS 编译。实际包由 GitHub macOS runner 构建。Rootless 安装示例：`dpkg -i com.example.trafficmonitor_<version>_iphoneos-arm64.deb`；不需要自动重启 SpringBoard，只需冷启动监控应用。
 
+## 查询手机出口 IP
+
+0.4.1 增加 `tm-probe --query-ip`。请求在手机上使用原生 NSURLSession GET `http://ip-api.com/json`，每次创建无缓存会话，沿用当时的 iOS 系统代理 / PAC 与 VPN 路由；代理失败直接报错，不切换直连。输出包含 IP、地区、运营商和组织的 JSON。不需要 curl 或 Procursus 源，也不需要启动监控应用或重新注销。
+
+`tm-probe --self-test-ip` 使用本机临时 HTTP 代理与 `.invalid` 域名验证代理请求，并测试 HTTP 错误和无效 JSON；不会请求外网。GoScrcpy 的代理面板和网络监控窗口共用此查询，缺少查询能力时使用 EXE 内置插件包升级。
+
 ## 工程
 
 `Tweak.xm`、`Sources/` 为采集代码；`probe/` 为独立诊断工具；`desktop/` 为 SQLite/USB 服务与 WebUI；`scripts/` 为静态/安装包检查；`.github/workflows/build.yml` 为 CI。fishhook 授权和修改说明见 `THIRD_PARTY_LICENSES/`。

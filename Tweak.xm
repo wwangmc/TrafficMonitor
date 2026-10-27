@@ -34,7 +34,7 @@ static void TMStart(void) {
         BOOL sockets=TMSocketInstall();
         const char *mode = TM_ROOTHIDE ? "roothide" : TM_ROOTLESS ? "rootless" : "rootful";
         os_log_with_type(log, OS_LOG_TYPE_DEFAULT,
-                         "event=loaded version=0.4.0 mode=%{public}s bundle=%{public}@ pid=%d http_enabled=%d socket_enabled=%d",
+                         "event=loaded version=0.4.1 mode=%{public}s bundle=%{public}@ pid=%d http_enabled=%d socket_enabled=%d",
                          mode, bundleID, (int)getpid(), (int)enabled,(int)sockets);
     }
 }

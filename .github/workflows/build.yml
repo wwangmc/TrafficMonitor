@@ -79,8 +79,9 @@ jobs:
         run: |
           set -o pipefail
           xcrun clang++ -std=c++17 -fobjc-arc -fblocks -DTM_SOCKET_TEST -framework Foundation \
-            probe/main.mm probe/TMFixture.mm Sources/TMHTTPMonitor.mm Sources/TMHTTPRecorder.mm Sources/TMSocket.mm \
+            probe/main.mm probe/TMIPQuery.mm probe/TMFixture.mm Sources/TMHTTPMonitor.mm Sources/TMHTTPRecorder.mm Sources/TMSocket.mm \
             -o "$RUNNER_TEMP/tm-probe-host"
+          "$RUNNER_TEMP/tm-probe-host" --self-test-ip 2>&1 | tee probe-ip.log
           "$RUNNER_TEMP/tm-probe-host" --self-test 2>&1 | tee probe-host.log
 
       - name: Install patched iOS 16.5 SDK
@@ -120,6 +121,7 @@ jobs:
             packages/*.deb
             package-inspection.json
             probe-host.log
+            probe-ip.log
             THIRD_PARTY_LICENSES/fishhook.txt
           if-no-files-found: error
           retention-days: 14
@@ -159,5 +161,6 @@ jobs:
           path: |
             build-${{ matrix.mode }}.log
             probe-host.log
+            probe-ip.log
           if-no-files-found: ignore
           retention-days: 14
