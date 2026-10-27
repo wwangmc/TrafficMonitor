@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) { throw 'Install Python 3.9 or later first.' }
-python -c "import tidevice" 2>$null
+python -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('tidevice') else 1)"
 if ($LASTEXITCODE -ne 0) {
     python -m pip install -r requirements.txt
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
