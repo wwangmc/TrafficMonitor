@@ -356,7 +356,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 row = store.db.execute('SELECT detail FROM http WHERE id=?', (query.get('id',[''])[0],)).fetchone()
             self.reply(200,json.loads(row[0]) if row else {})
         elif parsed.path == '/api/export':
-            data=store.state(query.get('app',[''])[0],604800)
+            try:
+                seconds=max(60,min(604800,int(query.get('range',['300'])[0])))
+                data=store.state(query.get('app',[''])[0],seconds,query.get('search',[''])[0])
+            except ValueError:
+                self.reply(400,{'error':'时间范围无效'});return
             self.reply(200,data)
         else: self.reply(404,{'error':'接口不存在'})
 

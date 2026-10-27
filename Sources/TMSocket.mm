@@ -13,7 +13,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #ifndef TM_SOCKET_TEST
-extern "C" void MSHookFunction(void *, void *, void **);
+#include "fishhook.h"
 #endif
 
 static constexpr unsigned N=4096, Q=2048;
@@ -113,11 +113,13 @@ BOOL TMSocketInstall(void){
     if(installed)return YES;
     if(!session)session=NSUUID.UUID.UUIDString;
 #ifndef TM_SOCKET_TEST
-#define HOOK(name) MSHookFunction((void *)o_##name,(void *)h_##name,(void **)&o_##name)
-    HOOK(socket);HOOK(connect);HOOK(send);HOOK(recv);HOOK(sendto);HOOK(recvfrom);HOOK(sendmsg);HOOK(recvmsg);
-    HOOK(read);HOOK(write);HOOK(readv);HOOK(writev);HOOK(close);HOOK(dup);HOOK(dup2);HOOK(accept);
+#define HOOK(name) {#name,(void *)h_##name,nullptr}
+    struct rebinding bindings[]={HOOK(socket),HOOK(connect),HOOK(send),HOOK(recv),HOOK(sendto),HOOK(recvfrom),HOOK(sendmsg),HOOK(recvmsg),
+        HOOK(read),HOOK(write),HOOK(readv),HOOK(writev),HOOK(close),HOOK(dup),HOOK(dup2),HOOK(accept)};
+    // Import rebinding avoids short libc trampolines and Mach exception-port hooks,
+    // which conflict with this game's Breakpad exception handler under ElleKit.
+    installed=tm_rebind_symbols(bindings,sizeof(bindings)/sizeof(bindings[0]))==0;
 #undef HOOK
-    installed=YES;
 #endif
     return installed;
 }
