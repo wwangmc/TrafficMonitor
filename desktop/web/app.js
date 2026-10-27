@@ -125,9 +125,10 @@ $("deleteRecords").onclick = () => {
   $("deleteDescription").textContent = "将删除「" + name + "」的全部监控记录。";
   $("deleteDialog").showModal();
 };
-$("cancelDelete").onclick = () => $("deleteDialog").close();
+$("cancelDelete").onclick = () => { deleteApp = ""; $("deleteDialog").close(); };
+$("deleteDialog").addEventListener("cancel", () => { deleteApp = ""; });
 $("confirmDelete").onclick = async () => {
-  if (!deleteApp || saving) return;
+  if (!deleteApp || saving || !$("deleteDialog").open) return;
   const app = deleteApp;
   $("deleteDialog").close();
   ++version;
