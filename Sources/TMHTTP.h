@@ -9,3 +9,4 @@ NSDictionary *TMHTTPHealth(void);
 void TMHTTPFlushForTesting(void);
 NSString *TMHTTPRedactedURL(NSURL *url);
 BOOL TMHTTPInstallHooks(void);
+BOOL TMMonitoringEnabled(void);

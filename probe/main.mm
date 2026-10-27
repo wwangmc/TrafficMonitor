@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
 #import "../Sources/TMHTTP.h"
+#import "../Sources/TMSocket.h"
 #include "TMFixture.h"
 #include <atomic>
 #include <cstdio>
@@ -36,7 +37,7 @@ static NSString *gSharedBaselineDispatchLabel;
 
 static NSURLSessionDataTask *RunCase(NSURLSession *session, dispatch_group_t group,
                                    NSMutableArray *results, NSString *label, NSURLRequest *request,
-                                   BOOL urlAPI, NSInteger status, NSData *expected, NSInteger failure) {
+                                   NSInteger urlAPI, NSInteger status, NSData *expected, NSInteger failure) {
     dispatch_group_enter(group);
     void (^completion)(NSData *, NSURLResponse *, NSError *) = ^(NSData *data, NSURLResponse *response, NSError *error) {
         NSInteger actual = [response isKindOfClass:NSHTTPURLResponse.class] ? ((NSHTTPURLResponse *)response).statusCode : 0;
@@ -60,10 +61,12 @@ static NSURLSessionDataTask *RunCase(NSURLSession *session, dispatch_group_t gro
         }
         dispatch_group_leave(group);
     };
-    NSURLSessionDataTask *task = urlAPI ? [session dataTaskWithURL:request.URL completionHandler:completion] :
-                                        [session dataTaskWithRequest:request completionHandler:completion];
+    NSURLSessionTask *task;
+    if(urlAPI==2)task=[session uploadTaskWithRequest:request fromData:request.HTTPBody completionHandler:completion];
+    else if(urlAPI==3)task=[session downloadTaskWithURL:request.URL completionHandler:^(NSURL *url,NSURLResponse *response,NSError *error){completion(url?[NSData dataWithContentsOfURL:url]:nil,response,error);}];
+    else task=urlAPI?[session dataTaskWithURL:request.URL completionHandler:completion]:[session dataTaskWithRequest:request completionHandler:completion];
     [task resume];
-    return task;
+    return (NSURLSessionDataTask *)task;
 }
 
 int main(int argc, char *argv[]) {
@@ -142,6 +145,8 @@ int main(int argc, char *argv[]) {
         }
         RunCase(NSURLSession.sharedSession, group, results, @"shared_session", request(@"/get/shared"), YES, 200, getBody, 0);
         RunCase(defaultSession, group, results, @"default_session", request(@"/get/default"), NO, 200, getBody, 0);
+        RunCase(session,group,results,@"upload_data",post,2,200,post.HTTPBody,0);
+        RunCase(session,group,results,@"download_completion",request(@"/get/download"),3,200,getBody,0);
         BOOL timedOut = dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 25 * NSEC_PER_SEC)) != 0;
         if (timedOut) { PrintJSON(@{@"result": @"FAIL", @"reason": @"callback_timeout"}); return 1; }
 
@@ -171,20 +176,22 @@ int main(int argc, char *argv[]) {
             [http addObject:event];
             [identifiers addObject:event[@"request_id"] ?: @""];
             fieldsOK &= [event[@"duration_ms"] isKindOfClass:NSNumber.class] && [event[@"duration_ms"] doubleValue] >= 0;
-            fieldsOK &= [event[@"pid"] intValue] == getpid() && [event[@"source"] isEqual:@"nsurlsession_data_completion"];
+            fieldsOK &= [event[@"pid"] intValue] == getpid() && [event[@"source"] hasPrefix:@"nsurlsession_"];
             if ([event[@"method"] isEqual:@"POST"]) bytesOK = [event[@"request_body_bytes"] intValue] == 10 && [event[@"response_body_bytes"] intValue] == 10;
             if ([event[@"url"] containsString:@"/redirect"]) redirectOK = [event[@"final_url"] isKindOfClass:NSString.class] && [event[@"final_url"] containsString:@"/final?"];
             if ([event[@"url"] containsString:@"/delay"]) cancellationOK = [event[@"error_code"] integerValue] == NSURLErrorCancelled && event[@"status_code"] == NSNull.null;
         }
-        BOOL callbacksOK = results.count == 40;
+        BOOL callbacksOK = results.count == 42;
         for (NSDictionary *result in results) callbacksOK &= [result[@"ok"] boolValue];
         struct stat fileStat{}, directoryStat{};
         BOOL permissionsOK = stat(path.fileSystemRepresentation, &fileStat) == 0 && (fileStat.st_mode & 0777) == 0600 &&
                              stat(directory.fileSystemRepresentation, &directoryStat) == 0 && (directoryStat.st_mode & 0777) == 0700;
         BOOL secretsOK = raw && ![raw containsString:@"tm_probe_"] && ![raw containsString:@"payload-42"] && ![raw containsString:@"Authorization"];
-        BOOL ok = callbacksOK && delegateOK && http.count == 40 && identifiers.count == 40 &&
+        BOOL socketOK=TMSocketSelfTest();
+        TMHTTPFlushForTesting();
+        BOOL ok = socketOK && callbacksOK && delegateOK && http.count == 43 && identifiers.count == 43 &&
                   fieldsOK && bytesOK && redirectOK && cancellationOK && secretsOK && permissionsOK;
-        PrintJSON(@{@"result": ok ? @"PASS" : @"FAIL", @"callbacks": results, @"http_events": @(http.count),
+        PrintJSON(@{@"result": ok ? @"PASS" : @"FAIL", @"socket_ok":@(socketOK),@"callbacks": results, @"http_events": @(http.count),
                     @"unique_requests": @(identifiers.count), @"fields_ok": @(fieldsOK), @"body_bytes_ok": @(bytesOK),
                     @"redirect_ok": @(redirectOK), @"cancellation_ok": @(cancellationOK), @"redaction_ok": @(secretsOK),
                     @"permissions_ok": @(permissionsOK), @"delegate_path_unchanged": @(delegateOK),

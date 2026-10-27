@@ -1,6 +1,6 @@
 Package: com.example.trafficmonitor
 Name: TrafficMonitor
-Version: 0.2.0
+Version: 0.3.0
 Architecture: iphoneos-arm
 Description: NSURLSession data-task completion monitoring with bounded async diagnostics
 Maintainer: Developer

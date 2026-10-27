@@ -3,6 +3,7 @@
 #import <unistd.h>
 #import "Sources/TMTarget.h"
 #import "Sources/TMHTTP.h"
+#import "Sources/TMSocket.h"
 
 #ifndef TM_ROOTLESS
 #error TM_ROOTLESS must be set by the project Makefile
@@ -13,7 +14,9 @@ static void TMStart(void) {
     @autoreleasepool {
         NSString *bundleID = NSBundle.mainBundle.bundleIdentifier;
         // Defense in depth if an injector disregards or caches the Filter plist.
-        if (![bundleID isEqualToString:TM_TARGET_BUNDLE_ID]) {
+        NSString *configurationPath=[[NSTemporaryDirectory() stringByAppendingPathComponent:@"TrafficMonitor"] stringByAppendingPathComponent:@"config.plist"];
+        NSDictionary *configuration=[NSDictionary dictionaryWithContentsOfFile:configurationPath];
+        if (![bundleID isEqualToString:TM_TARGET_BUNDLE_ID] && ![configuration[@"bundle_id"] isEqual:bundleID]) {
             return;
         }
 
@@ -28,11 +31,11 @@ static void TMStart(void) {
         NSString *directory = [NSTemporaryDirectory() stringByAppendingPathComponent:@"TrafficMonitor"];
         TMHTTPRecorderStart(directory);
         BOOL enabled = TMHTTPInstallHooks();
+        BOOL sockets=TMSocketInstall();
         const char *mode = TM_ROOTLESS ? "rootless" : "rootful";
         os_log_with_type(log, OS_LOG_TYPE_DEFAULT,
-                         "stage=2 event=loaded version=0.2.0 mode=%{public}s "
-                         "bundle=%{public}@ pid=%d http_enabled=%d sink=app_tmp/TrafficMonitor/http-events.jsonl",
-                         mode, bundleID, (int)getpid(), (int)enabled);
+                         "event=loaded version=0.3.0 mode=%{public}s bundle=%{public}@ pid=%d http_enabled=%d socket_enabled=%d",
+                         mode, bundleID, (int)getpid(), (int)enabled,(int)sockets);
     }
 }
 

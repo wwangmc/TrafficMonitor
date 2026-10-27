@@ -1,4 +1,5 @@
 #import "TMHTTP.h"
+#import "TMSocket.h"
 #import <os/lock.h>
 #import <os/log.h>
 #include <atomic>
@@ -6,6 +7,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <utility>
+NSString *TMCurrentFileName=@"http-events.jsonl";
 
 static constexpr unsigned kCapacity = 256;
 static constexpr off_t kMaxFileBytes = 1024 * 1024;
@@ -21,6 +24,11 @@ static os_log_t gLog;
 // Only the serial writer owns the following file state.
 static int gFD = -1;
 static off_t gFileBytes;
+static int gSocketFD=-1;
+static off_t gSocketBytes;
+static std::atomic<bool> gEnabled{true};
+static long long gGeneration=-1;
+BOOL TMMonitoringEnabled(void){return gEnabled.load(std::memory_order_relaxed);}
 
 NSString *TMHTTPRedactedURL(NSURL *url) {
     if (!url) return @"<unknown-url>";
@@ -53,7 +61,7 @@ static BOOL TMOpenFile(void) {
     if (lstat(directory, &directoryStat) != 0 || !S_ISDIR(directoryStat.st_mode) ||
         directoryStat.st_uid != getuid()) return NO;
     if (chmod(directory, 0700) != 0) return NO;
-    NSString *path = [gDirectory stringByAppendingPathComponent:@"http-events.jsonl"];
+    NSString *path = [gDirectory stringByAppendingPathComponent:TMCurrentFileName];
     int fd = open(path.fileSystemRepresentation, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW | O_CLOEXEC, 0600);
     if (fd < 0) return NO;
     struct stat fileStat;
@@ -68,21 +76,28 @@ static BOOL TMOpenFile(void) {
 }
 
 static void TMWriteEvent(NSDictionary *event) {
+    BOOL isSocket=[event[@"kind"] isEqual:@"socket_sample"];
+    // Reuse the same bounded writer with distinct HTTP and Socket file state.
+    if(isSocket){std::swap(gFD,gSocketFD);std::swap(gFileBytes,gSocketBytes);}
+    NSString *fileName=isSocket?@"socket-events.jsonl":@"http-events.jsonl";
+    // TMOpenFile takes its filename from this writer-only setting.
+    extern NSString *TMCurrentFileName;
+    TMCurrentFileName=fileName;
     NSError *error = nil;
     NSData *json = [NSJSONSerialization dataWithJSONObject:event options:0 error:&error];
     if (!json || json.length > 16 * 1024 || !TMOpenFile()) {
         gWriteErrors.fetch_add(1, std::memory_order_relaxed);
-        return;
+        if(isSocket){std::swap(gFD,gSocketFD);std::swap(gFileBytes,gSocketBytes);}return;
     }
     if (gFileBytes + (off_t)json.length + 1 > kMaxFileBytes) {
         close(gFD);
         gFD = -1;
-        NSString *current = [gDirectory stringByAppendingPathComponent:@"http-events.jsonl"];
+        NSString *current = [gDirectory stringByAppendingPathComponent:fileName];
         NSString *previous = [current stringByAppendingString:@".1"];
         // Rename atomically replaces only the single bounded previous segment.
         if (rename(current.fileSystemRepresentation, previous.fileSystemRepresentation) != 0 || !TMOpenFile()) {
             gWriteErrors.fetch_add(1, std::memory_order_relaxed);
-            return;
+            if(isSocket){std::swap(gFD,gSocketFD);std::swap(gFileBytes,gSocketBytes);}return;
         }
     }
     NSMutableData *line = [json mutableCopy];
@@ -96,13 +111,14 @@ static void TMWriteEvent(NSDictionary *event) {
             gWriteErrors.fetch_add(1, std::memory_order_relaxed);
             close(gFD);
             gFD = -1;
-            return;
+            if(isSocket){std::swap(gFD,gSocketFD);std::swap(gFileBytes,gSocketBytes);}return;
         }
         remaining -= (size_t)written;
         bytes += written;
         gFileBytes += written;
     }
     gWritten.fetch_add(1, std::memory_order_relaxed);
+    if(isSocket){std::swap(gFD,gSocketFD);std::swap(gFileBytes,gSocketBytes);}
 }
 
 static BOOL TMDrainBatch(void) {
@@ -152,6 +168,8 @@ void TMHTTPRecorderStart(NSString *directory) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         gDirectory = [directory copy];
+        NSDictionary *initial=[NSDictionary dictionaryWithContentsOfFile:[gDirectory stringByAppendingPathComponent:@"config.plist"]];
+        if(initial){gEnabled.store([initial[@"enabled"] boolValue]);gGeneration=[initial[@"generation"] longLongValue];}
         gLog = os_log_create("com.example.trafficmonitor", "http");
         dispatch_queue_attr_t attr = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0);
         gWriter = dispatch_queue_create("com.example.trafficmonitor.http-writer", attr);
@@ -162,6 +180,22 @@ void TMHTTPRecorderStart(NSString *directory) {
             @autoreleasepool {
                 TMDrainBatch();
                 static unsigned ticks;
+                if(ticks%4==0){
+                    NSDictionary *config=[NSDictionary dictionaryWithContentsOfFile:[gDirectory stringByAppendingPathComponent:@"config.plist"]];
+                    if(config){
+                        gEnabled.store([config[@"enabled"] boolValue]);
+                        long long generation=[config[@"generation"] longLongValue];
+                        if(gGeneration>=0 && generation!=gGeneration){
+                            if(gFD>=0)close(gFD);if(gSocketFD>=0)close(gSocketFD);gFD=gSocketFD=-1;gFileBytes=gSocketBytes=0;
+                            for(NSString *name in @[@"http-events.jsonl",@"http-events.jsonl.1",@"socket-events.jsonl",@"socket-events.jsonl.1"])
+                                unlink([gDirectory stringByAppendingPathComponent:name].fileSystemRepresentation);
+                        }
+                        gGeneration=generation;
+                    }
+                    TMSocketDrain();
+                    TMHTTPEnqueue(@{@"kind":@"collector_health",@"bundle_id":NSBundle.mainBundle.bundleIdentifier?:@"<probe>",
+                        @"time":@(NSDate.date.timeIntervalSince1970),@"enabled":@(gEnabled.load()),@"http":TMHTTPHealth(),@"socket":TMSocketHealth()});
+                }
                 if (++ticks % 40 == 0 && (gFull.load() || gBusy.load() || gWriteErrors.load())) {
                     os_log_error(gLog, "event=http_health dropped_full=%llu dropped_busy=%llu write_errors=%llu",
                                  (unsigned long long)gFull.load(), (unsigned long long)gBusy.load(),

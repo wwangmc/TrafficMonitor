@@ -13,8 +13,8 @@ endif
 
 include $(THEOS)/makefiles/common.mk
 TOOL_NAME = tm-probe
-tm-probe_FILES = main.mm TMFixture.mm ../Sources/TMHTTPMonitor.mm ../Sources/TMHTTPRecorder.mm
-tm-probe_CFLAGS = -fobjc-arc
+tm-probe_FILES = main.mm TMFixture.mm ../Sources/TMHTTPMonitor.mm ../Sources/TMHTTPRecorder.mm ../Sources/TMSocket.mm
+tm-probe_CFLAGS = -fobjc-arc -DTM_SOCKET_TEST
 tm-probe_CCFLAGS = -std=c++17
 tm-probe_FRAMEWORKS = Foundation
 tm-probe_INSTALL_PATH = /usr/libexec/trafficmonitor

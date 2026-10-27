@@ -69,8 +69,8 @@ jobs:
       - name: Run native HTTP integration probe
         run: |
           set -o pipefail
-          xcrun clang++ -std=c++17 -fobjc-arc -fblocks -framework Foundation \
-            probe/main.mm probe/TMFixture.mm Sources/TMHTTPMonitor.mm Sources/TMHTTPRecorder.mm \
+          xcrun clang++ -std=c++17 -fobjc-arc -fblocks -DTM_SOCKET_TEST -framework Foundation \
+            probe/main.mm probe/TMFixture.mm Sources/TMHTTPMonitor.mm Sources/TMHTTPRecorder.mm Sources/TMSocket.mm \
             -o "$RUNNER_TEMP/tm-probe-host"
           "$RUNNER_TEMP/tm-probe-host" --self-test 2>&1 | tee probe-host.log
 
