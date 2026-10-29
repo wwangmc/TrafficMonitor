@@ -124,6 +124,7 @@ BOOL TMSocketInstall(void){
     return installed;
 }
 NSDictionary *TMSocketHealth(void){return @{@"dropped":@(dropped.load()),@"peek_ignored":@(peeked.load()),@"connect_failures":@(failures.load()),@"queue_capacity":@(Q)};}
+void TMSocketDiscard(void){os_unfair_lock_lock(&lock);head=count=0;os_unfair_lock_unlock(&lock);}
 void TMSocketDrain(void){
     Guard guard;
     struct Sum{FD fd;uint64_t up=0,down=0,ops=0;int state=0;bool truncated=false;};

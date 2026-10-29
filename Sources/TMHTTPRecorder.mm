@@ -139,7 +139,7 @@ static BOOL TMDrainBatch(void) {
 }
 
 void TMHTTPEnqueue(NSDictionary *event) {
-    if (!gWriter || !event) return;
+    if (!gWriter || !event || !TMMonitoringEnabled()) return;
     gAttempts.fetch_add(1, std::memory_order_relaxed);
     if (!os_unfair_lock_trylock(&gLock)) {
         gBusy.fetch_add(1, std::memory_order_relaxed);
@@ -178,9 +178,8 @@ void TMHTTPRecorderStart(NSString *directory) {
                                  250 * NSEC_PER_MSEC, 50 * NSEC_PER_MSEC);
         dispatch_source_set_event_handler(gTimer, ^{
             @autoreleasepool {
-                TMDrainBatch();
                 static unsigned ticks;
-                if(ticks%4==0){
+                {
                     NSDictionary *config=[NSDictionary dictionaryWithContentsOfFile:[gDirectory stringByAppendingPathComponent:@"config.plist"]];
                     if(config){
                         gEnabled.store([config[@"enabled"] boolValue]);
@@ -192,10 +191,28 @@ void TMHTTPRecorderStart(NSString *directory) {
                         }
                         gGeneration=generation;
                     }
-                    TMSocketDrain();
-                    TMHTTPEnqueue(@{@"kind":@"collector_health",@"bundle_id":NSBundle.mainBundle.bundleIdentifier?:@"<probe>",
-                        @"time":@(NSDate.date.timeIntervalSince1970),@"enabled":@(gEnabled.load()),@"http":TMHTTPHealth(),@"socket":TMSocketHealth()});
+                    if(TMMonitoringEnabled() && ticks%4==0){
+                        TMSocketDrain();
+                        TMHTTPEnqueue(@{@"kind":@"collector_health",@"bundle_id":NSBundle.mainBundle.bundleIdentifier?:@"<probe>",
+                            @"time":@(NSDate.date.timeIntervalSince1970),@"enabled":@YES,@"http":TMHTTPHealth(),@"socket":TMSocketHealth()});
+                    }
                 }
+                // Check configuration before touching queued records. An app
+                // resuming from suspension must not flush stale events after stop.
+                if(!TMMonitoringEnabled()){
+                    os_unfair_lock_lock(&gLock);
+                    for(unsigned n=0; n<kCapacity; ++n)gEvents[n]=nil;
+                    gHead=gCount=0;
+                    os_unfair_lock_unlock(&gLock);
+                    TMSocketDiscard();
+                    if(gFD>=0)close(gFD);if(gSocketFD>=0)close(gSocketFD);gFD=gSocketFD=-1;
+                    // Remain restartable, but perform no health/event writes.
+                    dispatch_source_set_timer(gTimer,dispatch_time(DISPATCH_TIME_NOW,NSEC_PER_SEC),NSEC_PER_SEC,100*NSEC_PER_MSEC);
+                    ticks=0;
+                    return;
+                }
+                dispatch_source_set_timer(gTimer,dispatch_time(DISPATCH_TIME_NOW,250*NSEC_PER_MSEC),250*NSEC_PER_MSEC,50*NSEC_PER_MSEC);
+                TMDrainBatch();
                 if (++ticks % 40 == 0 && (gFull.load() || gBusy.load() || gWriteErrors.load())) {
                     os_log_error(gLog, "event=http_health dropped_full=%llu dropped_busy=%llu write_errors=%llu",
                                  (unsigned long long)gFull.load(), (unsigned long long)gBusy.load(),

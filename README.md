@@ -45,6 +45,10 @@ GoScrcpy 定制版已通过原生 Go 采集器集成此功能：右键 iOS 设�
 
 ## 工程
 
+0.4.2 支持显式关闭采集：将目标容器的 `tmp/TrafficMonitor/config.plist` 中 `enabled` 设为 false，保持 `generation` 不变；采集器停止事件与健康日志写入并关闭日志文件。已安装的 Hook 保留到应用退出，关闭期间仅保留低频配置检查以允许恢复。停用配置下重新加载动态库时不安装 Hook。GoScrcpy 关闭监控时还会将插件 Filter 设为不匹配真实应用的标识，避免后续启动注入；不修改其他插件或 RootHide Bootstrap 设置。
+
+`tm-probe --self-test-disable` 验证停用后事件/健康日志停止写入，恢复时保留原有历史。
+
 `Tweak.xm`、`Sources/` 为采集代码；`probe/` 为独立诊断工具；`desktop/` 为 SQLite/USB 服务与 WebUI；`scripts/` 为静态/安装包检查；`.github/workflows/build.yml` 为 CI。fishhook 授权和修改说明见 `THIRD_PARTY_LICENSES/`。
 
 URL 的 query 值全部脱敏，移除 user/password/fragment，不采集 header、cookie、请求或响应正文。URL path 仍可能包含业务标识。手机日志每类最多 2×1 MiB，电脑每类最多 100,000 条并按保留期清理。WebUI 无需访问令牌，保留 Host/Origin 校验、CSP、参数化 SQL 与纯文本 DOM。

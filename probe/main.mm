@@ -72,6 +72,29 @@ static NSURLSessionDataTask *RunCase(NSURLSession *session, dispatch_group_t gro
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
+        if(argc==2 && strcmp(argv[1],"--self-test-disable")==0){
+            NSString *dir=[NSTemporaryDirectory() stringByAppendingPathComponent:[@"TrafficMonitorStop-" stringByAppendingString:NSUUID.UUID.UUIDString]];
+            [NSFileManager.defaultManager createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+            NSString *config=[dir stringByAppendingPathComponent:@"config.plist"];
+            [@{@"enabled":@YES,@"generation":@37} writeToFile:config atomically:YES];
+            TMHTTPRecorderStart(dir);
+            TMHTTPEnqueue(@{@"kind":@"before_stop"});TMHTTPFlushForTesting();
+            [@{@"enabled":@NO,@"generation":@37} writeToFile:config atomically:YES];
+            for(unsigned i=0;i<30 && TMMonitoringEnabled();++i)usleep(100000);
+            BOOL disabled=!TMMonitoringEnabled();
+            uint64_t before=[TMHTTPHealth()[@"written"] unsignedLongLongValue];
+            for(unsigned i=0;i<100;++i)TMHTTPEnqueue(@{@"kind":@"must_not_write"});
+            usleep(2200000);TMHTTPFlushForTesting();
+            BOOL silent=before==[TMHTTPHealth()[@"written"] unsignedLongLongValue];
+            [@{@"enabled":@YES,@"generation":@37} writeToFile:config atomically:YES];
+            for(unsigned i=0;i<30 && !TMMonitoringEnabled();++i)usleep(100000);
+            TMHTTPEnqueue(@{@"kind":@"resumed"});TMHTTPFlushForTesting();
+            NSString *raw=[NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:@"http-events.jsonl"] encoding:NSUTF8StringEncoding error:nil];
+            BOOL resumed=TMMonitoringEnabled() && [raw containsString:@"before_stop"] && [raw containsString:@"resumed"] && ![raw containsString:@"must_not_write"];
+            BOOL ok=disabled&&silent&&resumed;
+            PrintJSON(@{@"result":ok?@"PASS":@"FAIL",@"disabled":@(disabled),@"no_health_or_event_writes":@(silent),@"resume_preserves_history":@(resumed)});
+            return ok?0:1;
+        }
         if (argc == 2 && strcmp(argv[1], "--query-ip") == 0) {
             NSError *error = nil;
             NSDictionary *result = TMQueryPublicIP(&error);

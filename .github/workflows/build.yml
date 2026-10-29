@@ -3,7 +3,7 @@ name: Build Theos packages
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, codex/monitor-stop]
   pull_request:
     branches: [main, master]
   workflow_dispatch:
@@ -82,6 +82,7 @@ jobs:
             probe/main.mm probe/TMIPQuery.mm probe/TMFixture.mm Sources/TMHTTPMonitor.mm Sources/TMHTTPRecorder.mm Sources/TMSocket.mm \
             -o "$RUNNER_TEMP/tm-probe-host"
           "$RUNNER_TEMP/tm-probe-host" --self-test-ip 2>&1 | tee probe-ip.log
+          "$RUNNER_TEMP/tm-probe-host" --self-test-disable 2>&1 | tee probe-disable.log
           "$RUNNER_TEMP/tm-probe-host" --self-test 2>&1 | tee probe-host.log
 
       - name: Install patched iOS 16.5 SDK
@@ -122,6 +123,7 @@ jobs:
             package-inspection.json
             probe-host.log
             probe-ip.log
+            probe-disable.log
             THIRD_PARTY_LICENSES/fishhook.txt
           if-no-files-found: error
           retention-days: 14
@@ -162,5 +164,6 @@ jobs:
             build-${{ matrix.mode }}.log
             probe-host.log
             probe-ip.log
+            probe-disable.log
           if-no-files-found: ignore
           retention-days: 14

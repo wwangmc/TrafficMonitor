@@ -16,6 +16,8 @@ static void TMStart(void) {
         // Defense in depth if an injector disregards or caches the Filter plist.
         NSString *configurationPath=[[NSTemporaryDirectory() stringByAppendingPathComponent:@"TrafficMonitor"] stringByAppendingPathComponent:@"config.plist"];
         NSDictionary *configuration=[NSDictionary dictionaryWithContentsOfFile:configurationPath];
+        // A stale injector Filter must not install hooks after explicit stop.
+        if(![configuration[@"enabled"] boolValue])return;
         if (![bundleID isEqualToString:TM_TARGET_BUNDLE_ID] && ![configuration[@"bundle_id"] isEqual:bundleID]) {
             return;
         }
@@ -34,7 +36,7 @@ static void TMStart(void) {
         BOOL sockets=TMSocketInstall();
         const char *mode = TM_ROOTHIDE ? "roothide" : TM_ROOTLESS ? "rootless" : "rootful";
         os_log_with_type(log, OS_LOG_TYPE_DEFAULT,
-                         "event=loaded version=0.4.1 mode=%{public}s bundle=%{public}@ pid=%d http_enabled=%d socket_enabled=%d",
+                         "event=loaded version=0.4.2 mode=%{public}s bundle=%{public}@ pid=%d http_enabled=%d socket_enabled=%d",
                          mode, bundleID, (int)getpid(), (int)enabled,(int)sockets);
     }
 }
