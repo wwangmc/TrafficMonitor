@@ -6,8 +6,8 @@
 | --- | --- | --- |
 | NSURLSession dataTask completion URL/Request | macOS/iOS 合成测试、目标游戏实际 HTTPS | redirect/error/cancel/并发/共享与普通 session 已测；自定义子类、缓存等未穷尽 |
 | delegate dataTask | 原 delegate 身份与回调保持，合成测试有正例 | 应用在装钩前创建的 session、动态替换 delegate 方法、后台系统进程不保证 |
-| upload data/file completion | data 有合成正例；不读取 file | file/stream body 未知；文件 upload 尚无独立真机用例 |
-| download completion | 合成正例，不读取下载文件 | body 字节未知，task 计数另列；resume-data/background 未覆盖 |
+| upload data/file completion | data 回调长度；0.4.3 文件大小元数据快照，不读取正文 | stream 无快照时用可用 task 计数；文件快照不等于失败/取消前实际上传量 |
+| download completion/delegate | 0.4.3 在应用回调前 stat 临时文件大小，缺失时用可用 task 计数 | 续传文件可包含已有内容；resume-data factory/background 未完整覆盖，不代表实际网卡流量 |
 | TCP/UDP IPv4/IPv6 | connect/send/recv/sendto/recvfrom/sendmsg/recvmsg，加 read/write/readv/writev/close/dup/dup2/accept；合成 TCP/UDP/IPv6 正例，游戏实际 TCP 正例 | 指动态导入符号，直接 syscall、私有变体、无法修改的导入段、未观察到的 API 会漏记；arm64e 仅编译未真机测 |
 | CFNetwork / CFHTTPStream | 暂无专用 HTTP hook | 底层若经过已挂钩导入可能产生 Socket 样本，不还原其 HTTP |
 | Network.framework / QUIC | 暂无专用 nw_connection 适配 | 不能假设全部经过公共 BSD 导入；本机游戏 HTTP 大文件与 Socket 样本字节明显不等，不能把 Socket 当完整总量 |

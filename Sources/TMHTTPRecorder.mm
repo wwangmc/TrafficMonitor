@@ -212,7 +212,10 @@ void TMHTTPRecorderStart(NSString *directory) {
                     return;
                 }
                 dispatch_source_set_timer(gTimer,dispatch_time(DISPATCH_TIME_NOW,250*NSEC_PER_MSEC),250*NSEC_PER_MSEC,50*NSEC_PER_MSEC);
-                TMDrainBatch();
+                // Catch up to one entire bounded queue per tick. Previously
+                // only 64 events were drained, capping sustained collection at
+                // 256 events/s even when the utility writer had spare capacity.
+                for(unsigned batch=0; batch<kCapacity/64; ++batch){if(!TMDrainBatch())break;}
                 if (++ticks % 40 == 0 && (gFull.load() || gBusy.load() || gWriteErrors.load())) {
                     os_log_error(gLog, "event=http_health dropped_full=%llu dropped_busy=%llu write_errors=%llu",
                                  (unsigned long long)gFull.load(), (unsigned long long)gBusy.load(),

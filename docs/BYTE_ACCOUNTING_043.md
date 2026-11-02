@@ -7,6 +7,8 @@
 - downloadTask completion 以前未提取临时文件大小，response_body_bytes 为 NULL；现在在应用回调移动/删除文件前只 stat 元数据，不读取文件正文。
 - file/stream upload 的未知请求大小与 SQL 的 up+down 组合，曾使已知下载量也变成 NULL，被域名 sum 排除。现在保留已知方向，并以 ≥ 标记不完整大小；两方向全未知仍为未知。
 - 缺失应用数据大小时可使用 task_count_bytes_sent/received 兜底；不同计数不相加，避免重复。桌面端可补录仍保留日志中的旧计数，已丢弃的日志无法恢复。
+- 原生测试发现有环境在文件实际上传完成后仍返回 task 上传计数 0；文件上传改用文件大小元数据快照，不读取文件内容，并标记其统计来源。
+- HTTP 异步 writer 原来每 250ms 仅消费 64 条，改为有界地最多消费整个 256 条队列；GoScrcpy 原来每秒每个文件仅读 24 KiB，改为每轮最多追读 8 页。仍为有界缓存，极端压力、断线或日志轮转仍可能丢失，不能宣称零丢包。
 
 新增回归：真实 URLSession URL/Request completion 下载 180+120 MiB，delegate 下载 4 MiB，文件上传；每个请求只记录一次，应用可在原回调内删除临时文件。fixture 以 64 KiB 块发送，不把大文件读进内存。另有 SQLite 部分未知、历史计数去重补录、删除后不复活测试。
 
