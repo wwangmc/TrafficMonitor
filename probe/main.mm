@@ -90,6 +90,7 @@ static int TestDownloadBytes(void) {
     [@"payload-42" writeToFile:upload atomically:YES encoding:NSUTF8StringEncoding error:nil];
     NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:[base stringByAppendingString:@"/post"]]];
     request.HTTPMethod=@"POST";
+    [request setValue:@"10" forHTTPHeaderField:@"Content-Length"];
     dispatch_semaphore_t uploaded=dispatch_semaphore_create(0);
     __block BOOL uploadOK=NO;
     [[session uploadTaskWithRequest:request fromFile:[NSURL fileURLWithPath:upload] completionHandler:^(NSData *data,NSURLResponse *response,NSError *error){
@@ -100,6 +101,7 @@ static int TestDownloadBytes(void) {
     [session finishTasksAndInvalidate];[delegated finishTasksAndInvalidate];fixture.stop();TMHTTPFlushForTesting();
     NSString *raw=[NSString stringWithContentsOfFile:[directory stringByAppendingPathComponent:@"http-events.jsonl"] encoding:NSUTF8StringEncoding error:nil];
     unsigned count=0;uint64_t downloadTotal=0;BOOL sourcesOK=YES,uploadBytesOK=NO;NSMutableSet *ids=[NSMutableSet set];
+    id uploadUp=NSNull.null,uploadDown=NSNull.null;
     for(NSString *line in [raw componentsSeparatedByString:@"\n"]){
         NSDictionary *event=[NSJSONSerialization JSONObjectWithData:[line dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
         if(![event[@"kind"] isEqual:@"http_request"])continue;
@@ -107,10 +109,10 @@ static int TestDownloadBytes(void) {
         if([event[@"url"] containsString:@"/bytes/"]){
             downloadTotal += [event[@"response_body_bytes"] unsignedLongLongValue];
             sourcesOK &= [event[@"response_bytes_source"] isEqual:@"download_file_size_not_wire"];
-        }else if([event[@"url"] hasSuffix:@"/post"]){uploadBytesOK=[event[@"request_body_bytes"] longLongValue]==10 && [event[@"response_body_bytes"] longLongValue]==10;}
+        }else if([event[@"url"] hasSuffix:@"/post"]){uploadUp=event[@"request_body_bytes"];uploadDown=event[@"response_body_bytes"];uploadBytesOK=[uploadUp longLongValue]==10 && [uploadDown longLongValue]==10;}
     }
     BOOL ok=finished&&callbacksOK&&delegateOK&&uploadOK&&uploadBytesOK&&count==4&&ids.count==4&&downloadTotal==304ULL*1024*1024&&sourcesOK;
-    PrintJSON(@{@"result":ok?@"PASS":@"FAIL",@"download_completion_bytes":@(300ULL*1024*1024),@"recorded_download_bytes":@(downloadTotal),@"expected_download_bytes":@(304ULL*1024*1024),@"http_events":@(count),@"unique_requests":@(ids.count),@"callbacks_ok":@(callbacksOK&&finished),@"delegate_download_ok":@(delegateOK),@"file_upload_ok":@(uploadOK&&uploadBytesOK),@"file_size_sources_ok":@(sourcesOK)});
+    PrintJSON(@{@"result":ok?@"PASS":@"FAIL",@"download_completion_bytes":@(300ULL*1024*1024),@"recorded_download_bytes":@(downloadTotal),@"expected_download_bytes":@(304ULL*1024*1024),@"http_events":@(count),@"unique_requests":@(ids.count),@"callbacks_ok":@(callbacksOK&&finished),@"delegate_download_ok":@(delegateOK),@"file_upload_ok":@(uploadOK&&uploadBytesOK),@"file_upload_callback_ok":@(uploadOK),@"file_upload_recorded_up":uploadUp,@"file_upload_recorded_down":uploadDown,@"file_size_sources_ok":@(sourcesOK)});
     return ok?0:1;
 }
 
