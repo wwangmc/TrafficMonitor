@@ -36,6 +36,84 @@ static NSString *gSharedBaselineDispatchLabel;
 }
 @end
 
+@interface TMProbeDownloadDelegate : NSObject <NSURLSessionDownloadDelegate>
+@property(nonatomic,strong) dispatch_semaphore_t finished;
+@property(nonatomic) int64_t fileBytes;
+@property(nonatomic,strong) NSError *error;
+@end
+@implementation TMProbeDownloadDelegate
+- (void)URLSession:(NSURLSession *)session downloadTask:(NSURLSessionDownloadTask *)task didFinishDownloadingToURL:(NSURL *)location {
+    struct stat info{};
+    self.fileBytes=stat(location.fileSystemRepresentation,&info)==0?info.st_size:-1;
+    // Model an app consuming the temporary file immediately in its callback.
+    [NSFileManager.defaultManager removeItemAtURL:location error:nil];
+}
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error {
+    self.error=error;dispatch_semaphore_signal(self.finished);
+}
+@end
+
+static int TestDownloadBytes(void) {
+    NSString *directory=[NSTemporaryDirectory() stringByAppendingPathComponent:[@"TrafficMonitorBytes-" stringByAppendingString:NSUUID.UUID.UUIDString]];
+    [NSFileManager.defaultManager createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
+    TMHTTPRecorderStart(directory);
+    TMFixture fixture;
+    if(!fixture.start() || !TMHTTPInstallHooks())return 1;
+    NSString *base=[NSString stringWithFormat:@"http://127.0.0.1:%u",fixture.port()];
+    NSURLSessionConfiguration *config=NSURLSessionConfiguration.ephemeralSessionConfiguration;
+    config.timeoutIntervalForResource=90;
+    NSURLSession *session=[NSURLSession sessionWithConfiguration:config];
+    dispatch_group_t group=dispatch_group_create();
+    __block BOOL callbacksOK=YES;
+    for(NSNumber *mib in @[@180,@120]){
+        dispatch_group_enter(group);
+        NSURL *url=[NSURL URLWithString:[base stringByAppendingFormat:@"/bytes/%@",mib]];
+        void (^callback)(NSURL *,NSURLResponse *,NSError *)=^(NSURL *location,NSURLResponse *response,NSError *error){
+            struct stat info{};
+            BOOL ok=!error && location && stat(location.fileSystemRepresentation,&info)==0 && info.st_size==mib.longLongValue*1024*1024;
+            @synchronized(session){callbacksOK &= ok;}
+            if(location)[NSFileManager.defaultManager removeItemAtURL:location error:nil];
+            dispatch_group_leave(group);
+        };
+        NSURLSessionDownloadTask *task=mib.intValue==180?[session downloadTaskWithURL:url completionHandler:callback]:[session downloadTaskWithRequest:[NSURLRequest requestWithURL:url] completionHandler:callback];
+        [task resume];
+    }
+    BOOL finished=dispatch_group_wait(group,dispatch_time(DISPATCH_TIME_NOW,100*NSEC_PER_SEC))==0;
+    TMProbeDownloadDelegate *delegate=[TMProbeDownloadDelegate new];
+    delegate.finished=dispatch_semaphore_create(0);
+    NSURLSession *delegated=[NSURLSession sessionWithConfiguration:config delegate:delegate delegateQueue:nil];
+    [[delegated downloadTaskWithURL:[NSURL URLWithString:[base stringByAppendingString:@"/bytes/4"]]] resume];
+    BOOL delegateOK=dispatch_semaphore_wait(delegate.finished,dispatch_time(DISPATCH_TIME_NOW,30*NSEC_PER_SEC))==0 && !delegate.error && delegate.fileBytes==4*1024*1024;
+    // File uploads used to have a NULL upload body that also erased the known
+    // response from the old SQL sum(up+down) aggregation.
+    NSString *upload=[directory stringByAppendingPathComponent:@"upload-fixture"];
+    [@"payload-42" writeToFile:upload atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:[base stringByAppendingString:@"/post"]]];
+    request.HTTPMethod=@"POST";
+    dispatch_semaphore_t uploaded=dispatch_semaphore_create(0);
+    __block BOOL uploadOK=NO;
+    [[session uploadTaskWithRequest:request fromFile:[NSURL fileURLWithPath:upload] completionHandler:^(NSData *data,NSURLResponse *response,NSError *error){
+        uploadOK=!error && data.length==10;dispatch_semaphore_signal(uploaded);
+    }] resume];
+    uploadOK=dispatch_semaphore_wait(uploaded,dispatch_time(DISPATCH_TIME_NOW,15*NSEC_PER_SEC))==0 && uploadOK;
+    [NSFileManager.defaultManager removeItemAtPath:upload error:nil];
+    [session finishTasksAndInvalidate];[delegated finishTasksAndInvalidate];fixture.stop();TMHTTPFlushForTesting();
+    NSString *raw=[NSString stringWithContentsOfFile:[directory stringByAppendingPathComponent:@"http-events.jsonl"] encoding:NSUTF8StringEncoding error:nil];
+    unsigned count=0;uint64_t downloadTotal=0;BOOL sourcesOK=YES,uploadBytesOK=NO;NSMutableSet *ids=[NSMutableSet set];
+    for(NSString *line in [raw componentsSeparatedByString:@"\n"]){
+        NSDictionary *event=[NSJSONSerialization JSONObjectWithData:[line dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+        if(![event[@"kind"] isEqual:@"http_request"])continue;
+        [ids addObject:event[@"request_id"]];++count;
+        if([event[@"url"] containsString:@"/bytes/"]){
+            downloadTotal += [event[@"response_body_bytes"] unsignedLongLongValue];
+            sourcesOK &= [event[@"response_bytes_source"] isEqual:@"download_file_size_not_wire"];
+        }else if([event[@"url"] hasSuffix:@"/post"]){uploadBytesOK=[event[@"request_body_bytes"] longLongValue]==10 && [event[@"response_body_bytes"] longLongValue]==10;}
+    }
+    BOOL ok=finished&&callbacksOK&&delegateOK&&uploadOK&&uploadBytesOK&&count==4&&ids.count==4&&downloadTotal==304ULL*1024*1024&&sourcesOK;
+    PrintJSON(@{@"result":ok?@"PASS":@"FAIL",@"download_completion_bytes":@(300ULL*1024*1024),@"recorded_download_bytes":@(downloadTotal),@"expected_download_bytes":@(304ULL*1024*1024),@"http_events":@(count),@"unique_requests":@(ids.count),@"callbacks_ok":@(callbacksOK&&finished),@"delegate_download_ok":@(delegateOK),@"file_upload_ok":@(uploadOK&&uploadBytesOK),@"file_size_sources_ok":@(sourcesOK)});
+    return ok?0:1;
+}
+
 static NSURLSessionDataTask *RunCase(NSURLSession *session, dispatch_group_t group,
                                    NSMutableArray *results, NSString *label, NSURLRequest *request,
                                    NSInteger urlAPI, NSInteger status, NSData *expected, NSInteger failure) {
@@ -72,6 +150,7 @@ static NSURLSessionDataTask *RunCase(NSURLSession *session, dispatch_group_t gro
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
+        if(argc==2 && strcmp(argv[1],"--self-test-bytes")==0)return TestDownloadBytes();
         if(argc==2 && strcmp(argv[1],"--self-test-disable")==0){
             NSString *dir=[NSTemporaryDirectory() stringByAppendingPathComponent:[@"TrafficMonitorStop-" stringByAppendingString:NSUUID.UUID.UUIDString]];
             [NSFileManager.defaultManager createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];

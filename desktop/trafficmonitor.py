@@ -182,9 +182,15 @@ class Store:
                         if kind == 'http_request':
                             url = str(e.get('url', ''))[:4096]
                             domain = urllib.parse.urlsplit(url).hostname or '<unknown>'
-                            self.db.execute('INSERT OR IGNORE INTO http VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+                            def body_count(body_key, task_key):
+                                value = e.get(body_key)
+                                if not isinstance(value, int) or value < 0:
+                                    value = e.get(task_key)
+                                return value if isinstance(value, int) and value >= 0 else None
+                            self.db.execute('''INSERT INTO http VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                                ON CONFLICT(id) DO UPDATE SET up=coalesce(http.up,excluded.up),down=coalesce(http.down,excluded.down) WHERE http.app=excluded.app''',
                                 (e['request_id'], app, at, e.get('method'), url, domain, e.get('status_code'),
-                                 e.get('duration_ms'), e.get('request_body_bytes'), e.get('response_body_bytes'),
+                                 e.get('duration_ms'), body_count('request_body_bytes','task_count_bytes_sent'), body_count('response_body_bytes','task_count_bytes_received'),
                                  e.get('source'), json.dumps(e, ensure_ascii=False)))
                         elif kind == 'socket_sample':
                             up, down = max(0, int(e['upload_bytes'])), max(0, int(e['download_bytes']))
@@ -360,12 +366,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with store.lock:
                 if view=='domains':
                     domains = [dict(row) for row in store.db.execute(
-                        'SELECT domain,sum(up+down) AS size,count(*) AS requests,'
+                        'SELECT domain,sum(CASE WHEN up IS NULL AND down IS NULL THEN NULL ELSE coalesce(up,0)+coalesce(down,0) END) AS size,count(*) AS requests,'
                         'sum(up IS NULL OR down IS NULL) AS unknown FROM http WHERE app=? '
                         'GROUP BY domain ORDER BY size IS NULL,size DESC,domain LIMIT 200', (app,))]
                 else:
                     requests = [dict(row) for row in store.db.execute(
-                        'SELECT url,size FROM (SELECT url,up+down AS size,at FROM http WHERE app=? '
+                        'SELECT url,size,unknown FROM (SELECT url,CASE WHEN up IS NULL AND down IS NULL THEN NULL ELSE coalesce(up,0)+coalesce(down,0) END AS size,(up IS NULL OR down IS NULL) AS unknown,at FROM http WHERE app=? '
                         'ORDER BY at DESC LIMIT 200) ORDER BY size IS NULL,size DESC,at DESC', (app,))]
             self.reply(200, {'app':app, 'requests':requests, 'domains':domains, 'view':view,
                             'apps':[{'id':a['id'],'name':a['name']} for a in collector.apps],

@@ -97,7 +97,7 @@ class BackendTest(unittest.TestCase):
         self.assertEqual([r['size'] for r in data['requests']],[30000,35,0,None])
         self.assertNotIn('rate',data)
         status,body,_=self.call('/api/requests?app=com.example.other')
-        self.assertEqual(json.loads(body)['requests'],[{'url':'https://example.com/other','size':300}])
+        self.assertEqual(json.loads(body)['requests'],[{'url':'https://example.com/other','size':300,'unknown':0}])
 
     def test_domains_aggregate_all_saved_requests_and_unknowns(self):
         self.seed()
@@ -122,6 +122,20 @@ class BackendTest(unittest.TestCase):
             {'domain':'example.com','size':7175,'requests':206,'unknown':1},
             {'domain':'unknown.test','size':None,'requests':1,'unknown':1}])
         self.assertEqual(self.call('/api/requests?view=invalid')[0],400)
+
+    def test_partial_download_and_legacy_task_counter_are_not_discarded(self):
+        self.seed()
+        self.collector.selected=['com.example.test']
+        event={'kind':'http_request','request_id':'large-download','bundle_id':'com.example.test','completed_at_unix':time.time(),
+               'url':'https://files.test/resource','request_body_bytes':None,'response_body_bytes':300*1024*1024}
+        legacy=dict(event,request_id='legacy-download',response_body_bytes=None,task_count_bytes_sent=0,task_count_bytes_received=50*1024*1024)
+        rows=[('com.example.test:http-events.jsonl','inode',500,('\n'.join(map(json.dumps,[event,legacy]))+'\n').encode())]
+        self.store.ingest(rows);self.store.ingest(rows)
+        _,body,_=self.call('/api/requests?view=domains')
+        domain=json.loads(body)['domains'][0]
+        self.assertEqual(domain,{'domain':'files.test','size':350*1024*1024,'requests':2,'unknown':1})
+        _,body,_=self.call('/api/requests')
+        self.assertEqual(json.loads(body)['requests'][0],{'url':event['url'],'size':300*1024*1024,'unknown':1})
 
     def test_delete_one_app_preserves_others_and_skips_old_reimport(self):
         self.seed()

@@ -4,6 +4,7 @@
 #import <os/log.h>
 #include <atomic>
 #include <unistd.h>
+#include <sys/stat.h>
 
 typedef void (^TMCompletion)(NSData *, NSURLResponse *, NSError *);
 typedef NSURLSessionDataTask *(*TMFactory)(id, SEL, id, TMCompletion);
@@ -47,6 +48,17 @@ struct TMFactoryGuard {
     ~TMFactoryGuard() { --gFactoryDepth; }
 };
 
+// Inspect metadata while the system's temporary URL is still valid. Never load
+// download contents into memory, and do this before the app moves/deletes it.
+static void TMDownloadSize(TMHTTPState *state, NSURL *location) {
+    if (!state || !TMMonitoringEnabled() || !location.isFileURL) return;
+    struct stat info{};
+    if (stat(location.fileSystemRepresentation, &info) == 0 && S_ISREG(info.st_mode) && info.st_size >= 0) {
+        state->responseBytes.store(info.st_size);
+        state.responseSource = @"download_file_size_not_wire";
+    }
+}
+
 static void TMCompleted(TMHTTPState *state, NSData *data, NSURLResponse *response, NSError *error) {
     if (state->completed.exchange(true) || !TMMonitoringEnabled()) return;
     const uint64_t completedTicks = mach_absolute_time();
@@ -55,6 +67,17 @@ static void TMCompleted(TMHTTPState *state, NSData *data, NSURLResponse *respons
     NSHTTPURLResponse *http = [response isKindOfClass:NSHTTPURLResponse.class] ? (id)response : nil;
     const int64_t sent = task ? task.countOfBytesSent : -1;
     const int64_t received = task ? task.countOfBytesReceived : -1;
+    NSNumber *up = state.bodyBytes;
+    NSString *upSource = up ? @"httpbody_snapshot_not_wire" : @"unknown_stream";
+    if (!up && sent >= 0) { up = @(sent); upSource = @"task_count_bytes_sent_not_wire"; }
+    int64_t observed = state->responseBytes.load();
+    NSNumber *down = data ? @(data.length) : observed >= 0 ? @(observed) : nil;
+    NSString *downSource = data ? @"completion_nsdata_not_wire" : state.responseSource;
+    // Some delegates do not expose a data/progress callback. Preserve any body
+    // size actually observed, otherwise retain the task's available byte count.
+    if ((!down || (down.longLongValue == 0 && received > 0)) && received >= 0) {
+        down = @(received); downSource = @"task_count_bytes_received_not_wire";
+    }
     NSString *errorDomain = nil;
     if (error) {
         // Never persist localizedDescription or userInfo: they can contain raw URLs.
@@ -75,10 +98,10 @@ static void TMCompleted(TMHTTPState *state, NSData *data, NSURLResponse *respons
         @"duration_source": @"first_resume_to_completion_callback_including_suspension",
         @"task_identifier": task ? @(task.taskIdentifier) : (id)NSNull.null,
         @"status_code": http ? @(http.statusCode) : (id)NSNull.null,
-        @"request_body_bytes": state.bodyBytes ?: (id)NSNull.null,
-        @"request_bytes_source": state.bodyBytes ? @"httpbody_snapshot_not_wire" : @"unknown_stream",
-        @"response_body_bytes": data ? @(data.length) : state->responseBytes.load()>=0?@(state->responseBytes.load()):(id)NSNull.null,
-        @"response_bytes_source": state.responseSource?:@"completion_nsdata_not_wire",
+        @"request_body_bytes": up ?: (id)NSNull.null,
+        @"request_bytes_source": upSource,
+        @"response_body_bytes": down ?: (id)NSNull.null,
+        @"response_bytes_source": downSource ?: @"unknown",
         @"task_count_bytes_sent": sent >= 0 ? @(sent) : (id)NSNull.null,
         @"task_count_bytes_received": received >= 0 ? @(received) : (id)NSNull.null,
         @"error_domain": errorDomain ?: (id)NSNull.null,
@@ -131,6 +154,16 @@ static void TMObserveDelegate(id delegate){
             TMHTTPState *s=objc_getAssociatedObject(task,&gStateKey);if(s.delegatePath)s->responseBytes.store(total);
             if(oldProgress)((void(*)(id,SEL,id,id,int64_t,int64_t,int64_t))oldProgress)(object,progress,session,task,delta,total,expected);
         });class_replaceMethod(cls,progress,hook,m?method_getTypeEncoding(m):"v@:@@qqq");
+        SEL finish=@selector(URLSession:downloadTask:didFinishDownloadingToURL:);
+        m=class_getInstanceMethod(cls,finish);
+        if(m){
+            IMP oldFinish=method_getImplementation(m);
+            hook=imp_implementationWithBlock(^(id object,NSURLSession *session,NSURLSessionDownloadTask *task,NSURL *location){
+                TMHTTPState *s=objc_getAssociatedObject(task,&gStateKey);
+                if(s.delegatePath){@try{TMDownloadSize(s,location);}@catch(NSException *e){}}
+                ((void(*)(id,SEL,id,id,id))oldFinish)(object,finish,session,task,location);
+            });class_replaceMethod(cls,finish,hook,method_getTypeEncoding(m));
+        }
     }
 }
 
@@ -150,7 +183,7 @@ static id TMDownload(id object,SEL selector,id input,TMDownloadCompletion callba
     if(gFactoryDepth||!callback)return ((id(*)(id,SEL,id,id))original)(object,selector,input,callback);
     TMFactoryGuard guard;TMHTTPState *s=TMNewState(isURL?[NSURLRequest requestWithURL:input]:input);
     if(!s)return ((id(*)(id,SEL,id,id))original)(object,selector,input,callback);
-    s.responseSource=@"download_file_not_read";id task=((id(*)(id,SEL,id,id))original)(object,selector,input,^(NSURL *url,NSURLResponse *response,NSError *error){@try{TMCompleted(s,nil,response,error);}@catch(NSException*e){}callback(url,response,error);});
+    id task=((id(*)(id,SEL,id,id))original)(object,selector,input,^(NSURL *url,NSURLResponse *response,NSError *error){@try{TMDownloadSize(s,url);TMCompleted(s,nil,response,error);}@catch(NSException*e){}callback(url,response,error);});
     s.task=task;objc_setAssociatedObject(task,&gStateKey,s,OBJC_ASSOCIATION_RETAIN_NONATOMIC);return task;
 }
 static id TMDownloadURL(id o,SEL c,NSURL*u,TMDownloadCompletion b){return TMDownload(o,c,u,b,YES);}

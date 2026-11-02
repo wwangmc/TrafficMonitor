@@ -47,9 +47,9 @@ function render(data) {
     const size = document.createElement("td");
     size.className = "size" + (request.size === null ? " unknown" : "");
     size.textContent = sizeLabel(request.size);
+    if (request.unknown && request.size !== null) size.textContent = "≥ " + size.textContent;
     if (request.size !== null) size.title = request.size + " 字节";
     if (mode === "domains") {
-      if (request.unknown && request.size !== null) size.textContent = "≥ " + size.textContent;
       size.title = request.requests + " 条请求，其中 " + request.unknown + " 条大小未知" +
         (request.size === null ? "" : "；已知合计 " + request.size + " 字节");
     }

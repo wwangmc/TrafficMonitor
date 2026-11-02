@@ -79,6 +79,17 @@ void TMFixture::serve(int fd) {
     std::string path = target.substr(0, target.find('?'));
     if (path == "/disconnect") { close(fd); return; }
     if (path == "/delay") std::this_thread::sleep_for(std::chrono::seconds(2));
+    if (path == "/bytes/180" || path == "/bytes/120" || path == "/bytes/4") {
+        // Stream bounded chunks; a 300 MiB regression must not allocate 300 MiB
+        // inside a phone process merely to test its download accounting.
+        size_t remaining = (size_t)std::strtoul(path.c_str()+7,nullptr,10)*1024*1024;
+        std::string headers="HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/octet-stream\r\nContent-Length: "+std::to_string(remaining)+"\r\n\r\n";
+        if(sendAll(fd,headers)){
+            const std::string chunk(64*1024,'x');
+            while(remaining){size_t n=std::min(remaining,chunk.size());if(!sendAll(fd,n==chunk.size()?chunk:chunk.substr(0,n)))break;remaining-=n;}
+        }
+        close(fd);return;
+    }
     int status = path == "/missing" ? 404 : (path == "/redirect" ? 302 : 200);
     std::string body = path == "/post" ? request.substr(headerEnd + 4, bodySize) :
                        (path == "/final" ? "final-ok" : (path == "/missing" ? "not-found" : "get-ok"));
