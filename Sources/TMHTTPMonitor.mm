@@ -26,6 +26,7 @@ static char gStateKey;
 @property(nonatomic, copy) NSString *method;
 @property(nonatomic, copy) NSString *url;
 @property(nonatomic, strong) NSNumber *bodyBytes;
+@property(nonatomic, copy) NSString *bodySource;
 @property(nonatomic) uint64_t createdTicks;
 @property(nonatomic) NSTimeInterval createdWall;
 @property(nonatomic) BOOL delegatePath;
@@ -50,11 +51,19 @@ struct TMFactoryGuard {
 
 // Inspect metadata while the system's temporary URL is still valid. Never load
 // download contents into memory, and do this before the app moves/deletes it.
-static void TMDownloadSize(TMHTTPState *state, NSURL *location) {
-    if (!state || !TMMonitoringEnabled() || !location.isFileURL) return;
+static NSNumber *TMFileSize(NSURL *location) {
+    if (!location.isFileURL) return nil;
     struct stat info{};
     if (stat(location.fileSystemRepresentation, &info) == 0 && S_ISREG(info.st_mode) && info.st_size >= 0) {
-        state->responseBytes.store(info.st_size);
+        return @(info.st_size);
+    }
+    return nil;
+}
+static void TMDownloadSize(TMHTTPState *state, NSURL *location) {
+    if (!state || !TMMonitoringEnabled()) return;
+    NSNumber *size=TMFileSize(location);
+    if(size){
+        state->responseBytes.store(size.longLongValue);
         state.responseSource = @"download_file_size_not_wire";
     }
 }
@@ -68,7 +77,7 @@ static void TMCompleted(TMHTTPState *state, NSData *data, NSURLResponse *respons
     const int64_t sent = task ? task.countOfBytesSent : -1;
     const int64_t received = task ? task.countOfBytesReceived : -1;
     NSNumber *up = state.bodyBytes;
-    NSString *upSource = up ? @"httpbody_snapshot_not_wire" : @"unknown_stream";
+    NSString *upSource = state.bodySource ?: (up ? @"httpbody_snapshot_not_wire" : @"unknown_stream");
     if (!up && sent >= 0) { up = @(sent); upSource = @"task_count_bytes_sent_not_wire"; }
     int64_t observed = state->responseBytes.load();
     NSNumber *down = data ? @(data.length) : observed >= 0 ? @(observed) : nil;
@@ -173,7 +182,9 @@ static id TMUpload(id object,SEL selector,NSURLRequest *request,id body,TMComple
     IMP original=file?gUploadFile:gUploadData;
     if(gFactoryDepth||!callback)return ((id(*)(id,SEL,id,id,id))original)(object,selector,request,body,callback);
     TMFactoryGuard guard;TMHTTPState *s=TMNewState(request);if(!s)return ((id(*)(id,SEL,id,id,id))original)(object,selector,request,body,callback);
-    s.bodyBytes=file?nil:@([body length]);id task=((id(*)(id,SEL,id,id,id))original)(object,selector,request,body,^(NSData *data,NSURLResponse *response,NSError *error){@try{TMCompleted(s,data,response,error);}@catch(NSException *e){}callback(data,response,error);});
+    s.bodyBytes=file?TMFileSize(body):@([body length]);
+    if(file && s.bodyBytes)s.bodySource=@"upload_file_size_snapshot_not_wire";
+    id task=((id(*)(id,SEL,id,id,id))original)(object,selector,request,body,^(NSData *data,NSURLResponse *response,NSError *error){@try{TMCompleted(s,data,response,error);}@catch(NSException *e){}callback(data,response,error);});
     s.task=task;objc_setAssociatedObject(task,&gStateKey,s,OBJC_ASSOCIATION_RETAIN_NONATOMIC);return task;
 }
 static id TMUploadData(id o,SEL c,NSURLRequest*r,NSData*d,TMCompletion b){return TMUpload(o,c,r,d,b,NO);}
